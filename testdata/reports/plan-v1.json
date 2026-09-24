@@ -1,0 +1,15 @@
+{
+  "schema_version": 1,
+  "kind": "plan",
+  "result": "ok",
+  "items": [
+    {
+      "source": "a.md",
+      "action": "skip"
+    }
+  ],
+  "counts": {
+    "skip": 1
+  },
+  "blocked": false
+}

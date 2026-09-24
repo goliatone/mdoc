@@ -1,0 +1,40 @@
+version: 2
+project_id: generic-fixture-project
+default_profile: testing
+root: .
+pandoc_binary: pandoc
+output:
+  format: json
+  quiet: false
+profiles:
+  testing:
+    sources:
+      include:
+        - docs/**/*.md
+      exclude:
+        - docs/drafts/**
+      external_roots: []
+    entry: docs/README.md
+    naming:
+      source: file
+      mapping: {}
+    validation:
+      title: optional
+      heading_jumps: warning
+      unpublished_markdown_links: warning
+      max_table_columns: 5
+      image_types: [png, jpg, jpeg, svg]
+    style:
+      reference_docx: ""
+      heading_filter: none
+      filters: []
+      roots: []
+      reader: gfm
+    destination:
+      mode: immutable_review
+      parent_folder_id: ""
+      staging_folder_id: ""
+      review_folder_id: ""
+      staging_folder_name: Fixture Staging
+      review_folder_name: Fixture Review
+    state_file: .private/state.json

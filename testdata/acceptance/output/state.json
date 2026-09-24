@@ -1,0 +1,222 @@
+{
+  "version": 5,
+  "workspace_id": "momentum-layout-acceptance",
+  "profile": "acceptance",
+  "account": "burgosemi@gmail.com",
+  "folders": {
+    "staging_id": "1bQhVUfwYjhq680nxuw1NEbBbznj-XsVh",
+    "review_id": "1X8ro5WzxNKR6JLTAPjOev3QzPuk-AVXl"
+  },
+  "targets": {
+    "publication:engagement-report": {
+      "target_key": "publication:engagement-report",
+      "publication_id": "engagement-report",
+      "publication_kind": "bundle",
+      "members": [
+        "docs/engagement/12_FINAL_REPORT.md",
+        "docs/engagement/09_BEST_PRACTICES.md",
+        "docs/engagement/09_BEST_PRACTICES_APPENDIX.md",
+        "docs/engagement/11_OPERATIONS_PROPOSAL.md",
+        "docs/engagement/10_AUTH_ARCHITECTURE.md",
+        "docs/engagement/08_SECURITY_ASSESSMENT.md",
+        "docs/engagement/01_DISCOVERY.md",
+        "docs/engagement/02_INTAKE_APP_AUDIT.md",
+        "docs/engagement/03_PRODUCTION_APP_AUDIT.md",
+        "docs/engagement/04_SCHEDULING_APP_AUDIT.md",
+        "docs/engagement/05_GITHUB_DEPLOYMENT_AUDIT.md",
+        "docs/engagement/06_VERCEL_AUDIT.md",
+        "docs/engagement/07_SUPABASE_AUDIT.md"
+      ],
+      "source_hash": "sha256:401316e0e9773f800aa4e36722ac2cdd07a501f6387578182b7c2d344d305306",
+      "render_hash": "sha256:324fd83eec79ed9835155a811b8667b2dad8e69f95aa54f7875a48263d6fbbb9",
+      "active_target": {
+        "file_id": "1NECDiNF1g4m6tek-ikVAivoMmbvBVFCyyi1vHMD-K1w",
+        "url": "https://docs.google.com/document/d/1NECDiNF1g4m6tek-ikVAivoMmbvBVFCyyi1vHMD-K1w/edit?usp=drivesdk",
+        "review_set_id": "ef1f59cd304fe1e39070c4b01d4b4b51",
+        "generation": 6,
+        "operation_id": "981b2461e9884bd1987e5829b5e4d5f4",
+        "publish_status": "ready",
+        "remote_version": "8",
+        "docs_revision": "AIroW36ESne3cJpUY35kV8CAtMPjqYV8OhFkxedhwqzknvqQzSizHKPum2pURAkx5QHFls2r-j6J6ijT4sWWo1Rp-LhaWqPb02jLRInyOIo",
+        "modified_time": "2026-08-05T03:52:54.159Z",
+        "published_at": "2026-08-05T03:53:33.235259Z",
+        "review_snapshot": {
+          "version": 2,
+          "manifest_hash": "73afd097a1c4c90b302226e27972c4e1ea27aa69d50d69ec84a5745947da82f4",
+          "baseline_hash": "bd50c0134e37bee45f616d8ef4314fb8acd3c9075b026f2fd2b5621f3bfbc8d4",
+          "captured_revision": "AIroW36ESne3cJpUY35kV8CAtMPjqYV8OhFkxedhwqzknvqQzSizHKPum2pURAkx5QHFls2r-j6J6ijT4sWWo1Rp-LhaWqPb02jLRInyOIo",
+          "activated_revision": "AIroW36ESne3cJpUY35kV8CAtMPjqYV8OhFkxedhwqzknvqQzSizHKPum2pURAkx5QHFls2r-j6J6ijT4sWWo1Rp-LhaWqPb02jLRInyOIo"
+        }
+      },
+      "prior_targets": [
+        {
+          "file_id": "1-RLQBcaPRRyWOOEwl1oEn8XIlcZawLPF_Pr224ToGAo",
+          "url": "https://docs.google.com/document/d/1-RLQBcaPRRyWOOEwl1oEn8XIlcZawLPF_Pr224ToGAo/edit?usp=drivesdk",
+          "review_set_id": "2ee5c164be06aa33aac909b2cea6728d",
+          "generation": 1,
+          "operation_id": "ebd5f3bb5fb48a1a6787a49ae7d6e5f0",
+          "publish_status": "ready",
+          "remote_version": "8",
+          "docs_revision": "AIroW35sLXQFEx9ciAObW_5IFL0JsMnVyU19OxwO0cf_8ZR0Z8SjBqoCP1sh9OIwi2OA4YpXIV8UJFz1EByU4V1QS5SV6kmr5--TYsPCg_M",
+          "modified_time": "2026-08-03T00:55:12.556Z",
+          "published_at": "2026-08-03T00:55:33.723946Z"
+        },
+        {
+          "file_id": "1_larfMLEhhwyRO119KIV766jqvGFZ8_Y_8Nb4DBht-Q",
+          "url": "https://docs.google.com/document/d/1_larfMLEhhwyRO119KIV766jqvGFZ8_Y_8Nb4DBht-Q/edit?usp=drivesdk",
+          "review_set_id": "cb90641fc374bc776da36ce81c38f7a1",
+          "generation": 2,
+          "operation_id": "9785b783750c628f7fe611f16487254e",
+          "publish_status": "ready",
+          "remote_version": "8",
+          "docs_revision": "AIroW359XnYNv24X-gGDtsKCvM62A977yB6tDvNuDfpVjiosXf5GKQzgZhdcMDZLzzp1bV57F1Qm2mVimNfSnT6AUpSVqzRw9vMZgf0A3Lg",
+          "modified_time": "2026-08-03T01:17:03.463Z",
+          "published_at": "2026-08-03T01:17:20.449702Z"
+        },
+        {
+          "file_id": "1KiTX_MMrUoiQgGl05gHfSkMZGPiv332JueR9ZMLyUJY",
+          "url": "https://docs.google.com/document/d/1KiTX_MMrUoiQgGl05gHfSkMZGPiv332JueR9ZMLyUJY/edit?usp=drivesdk",
+          "review_set_id": "7f34efb099872b8014e5c0c016a64583",
+          "generation": 3,
+          "operation_id": "2ded915c12fe3745f89bc66fc7ce753c",
+          "publish_status": "ready",
+          "remote_version": "8",
+          "docs_revision": "AIroW35uYKR9jPrzmM-NEYHr4tVnl_XqYPECl6D3ELSzIv3G4BQ7xseTEr5OSxh_BNAbBpZ3rFV56VwuUxwdUAA_JhcpxY7KW1C3VtgrjZE",
+          "modified_time": "2026-08-03T01:37:34.857Z",
+          "published_at": "2026-08-03T01:37:52.605531Z"
+        },
+        {
+          "file_id": "1OnGtSM0Orkx4y2LFSf_EkYAg6ZxizW74RL_aL0jFOD4",
+          "url": "https://docs.google.com/document/d/1OnGtSM0Orkx4y2LFSf_EkYAg6ZxizW74RL_aL0jFOD4/edit?usp=drivesdk",
+          "review_set_id": "e52aa5d9845443a9b40ddba6cd930d32",
+          "generation": 4,
+          "operation_id": "5cf85043c4af572c77c39dec6c450588",
+          "publish_status": "ready",
+          "remote_version": "8",
+          "docs_revision": "AIroW34vfYaDHEyEFBC9yTwQ6OEMkpVWemZbO0bINAhX8kFk-mAuD10JmNN6I95pTHhnYcaICLiDmtPGAecZZFjtQ1EQ6DMMbNGt2QV-pWg",
+          "modified_time": "2026-08-03T04:45:18.411Z",
+          "published_at": "2026-08-03T04:45:48.381645Z"
+        },
+        {
+          "file_id": "1G_MtdGv8l1qKiIZjPe-Gvm6RCHVp8M4_a4se2EeU19g",
+          "url": "https://docs.google.com/document/d/1G_MtdGv8l1qKiIZjPe-Gvm6RCHVp8M4_a4se2EeU19g/edit?usp=drivesdk",
+          "review_set_id": "e3384d5a4edde29860d207c0e496e23e",
+          "generation": 5,
+          "operation_id": "d10c04c980a5fb5359f75f255044dd67",
+          "publish_status": "ready",
+          "remote_version": "9",
+          "docs_revision": "AIroW35NccULJKh-Tus461F1fF_krjutn0rsrvk5XA8OEgZ25L3VktIBZTr8O1OhQRDLAM1iifg17NgH-gHXWH-k8kNmhnN_OsYDOMTUOK0",
+          "modified_time": "2026-08-04T06:13:43.033Z",
+          "published_at": "2026-08-04T06:14:19.76472Z",
+          "review_snapshot": {
+            "version": 1,
+            "manifest_hash": "962aef42658407769a302145cca581e694ea4362323f21cb164f4efd6b9be153",
+            "baseline_hash": "718a540546cfca853db17825559c65b7686e282521f74f67db14c3bce6ea53e6",
+            "captured_revision": "AIroW35NccULJKh-Tus461F1fF_krjutn0rsrvk5XA8OEgZ25L3VktIBZTr8O1OhQRDLAM1iifg17NgH-gHXWH-k8kNmhnN_OsYDOMTUOK0",
+            "activated_revision": "AIroW35NccULJKh-Tus461F1fF_krjutn0rsrvk5XA8OEgZ25L3VktIBZTr8O1OhQRDLAM1iifg17NgH-gHXWH-k8kNmhnN_OsYDOMTUOK0"
+          }
+        }
+      ]
+    },
+    "publication:review-bundle": {
+      "target_key": "publication:review-bundle",
+      "publication_id": "review-bundle",
+      "publication_kind": "bundle",
+      "members": [
+        "tools/mdoc/testdata/acceptance/review/member-a.md",
+        "tools/mdoc/testdata/acceptance/review/member-b.md"
+      ],
+      "source_hash": "sha256:d723cd7d06bb254b096b7a1a5504c8c1919dcf24c391e1e4108f1c8a7acd67e6",
+      "render_hash": "sha256:3f21a70086e897d8454125e6af36fae05cb6e4661591f3739e69ceb3a8ba25fe",
+      "active_target": {
+        "file_id": "1ZnKuH83fN6IYs-13FumqrXKSIn9Ax94tjopIkMjY09M",
+        "url": "https://docs.google.com/document/d/1ZnKuH83fN6IYs-13FumqrXKSIn9Ax94tjopIkMjY09M/edit?usp=drivesdk",
+        "review_set_id": "0a7c90b9a43bcdaa145142d6689e2162",
+        "generation": 1,
+        "operation_id": "093ab1713ece40af5811f762d2623832",
+        "publish_status": "ready",
+        "remote_version": "8",
+        "docs_revision": "AIroW35ubW2iNXeM9oFaDKEI9kny_ySNPco2RciEDNQN_nSpVcPavVcmmypNz-9z8ZOLIj3Gsor81gJPWTliWbdkrguXH5DW7ITo8O5l_wY",
+        "modified_time": "2026-08-04T05:40:00.124Z",
+        "published_at": "2026-08-04T05:40:03.25392Z",
+        "review_snapshot": {
+          "version": 1,
+          "manifest_hash": "87581e7a0ac788e10d3a973416e0c846443c9631277d894e4b9c116422c8f4e5",
+          "baseline_hash": "3334e97c8262d7bad8d66144c4b3399cc78f5ae3f74702982aa87b20c80e9147",
+          "captured_revision": "AIroW35ubW2iNXeM9oFaDKEI9kny_ySNPco2RciEDNQN_nSpVcPavVcmmypNz-9z8ZOLIj3Gsor81gJPWTliWbdkrguXH5DW7ITo8O5l_wY",
+          "activated_revision": "AIroW35ubW2iNXeM9oFaDKEI9kny_ySNPco2RciEDNQN_nSpVcPavVcmmypNz-9z8ZOLIj3Gsor81gJPWTliWbdkrguXH5DW7ITo8O5l_wY"
+        }
+      }
+    },
+    "publication:review-source": {
+      "target_key": "publication:review-source",
+      "publication_id": "review-source",
+      "publication_kind": "source",
+      "source": "tools/mdoc/testdata/acceptance/review/source.md",
+      "members": [
+        "tools/mdoc/testdata/acceptance/review/source.md"
+      ],
+      "source_hash": "sha256:110417e8d5758680e0477d4eac6e6ea8ed96ee9daddca24455d6c40cdd201ac6",
+      "render_hash": "sha256:171c8d0a1dc8bcfbe2054bcd6dd2c75bfb0161a2a01764c7a7ebae6360e8a4a1",
+      "active_target": {
+        "file_id": "1A0Jy73ThjQc2tqF6kQeR5fBC0F-dba4gKvi6X7NcWec",
+        "url": "https://docs.google.com/document/d/1A0Jy73ThjQc2tqF6kQeR5fBC0F-dba4gKvi6X7NcWec/edit?usp=drivesdk",
+        "review_set_id": "d61053d3710d1ccfe90338d56b66728a",
+        "generation": 3,
+        "operation_id": "57116b0ed6b76788dae57eabc6f031d1",
+        "publish_status": "ready",
+        "remote_version": "8",
+        "docs_revision": "AIroW34VX1op9gQfLw84ui2wOTuQb3HjqIL9TAK65XEGk7HTO4Fe7TrhumfvIl8y2yFvyl3-722oZ1R3pv1BkD7G-Xuqw5r_nx26T-a_giI",
+        "modified_time": "2026-08-04T05:54:52.333Z",
+        "published_at": "2026-08-04T05:54:54.895341Z",
+        "review_snapshot": {
+          "version": 1,
+          "manifest_hash": "bad0db63d965f3af3b036470ca062eb6e38c0b74661ba2ad805f6709598f4a9b",
+          "baseline_hash": "2babbb900b0508ad829f408b00e4befeaecb91d2ca18f59800107a0eee8780da",
+          "captured_revision": "AIroW34VX1op9gQfLw84ui2wOTuQb3HjqIL9TAK65XEGk7HTO4Fe7TrhumfvIl8y2yFvyl3-722oZ1R3pv1BkD7G-Xuqw5r_nx26T-a_giI",
+          "activated_revision": "AIroW34VX1op9gQfLw84ui2wOTuQb3HjqIL9TAK65XEGk7HTO4Fe7TrhumfvIl8y2yFvyl3-722oZ1R3pv1BkD7G-Xuqw5r_nx26T-a_giI"
+        }
+      },
+      "prior_targets": [
+        {
+          "file_id": "14M4OpB2WEbd4WrB5EWZxAnyo1IblSaN9ZnX3zm1gqaU",
+          "url": "https://docs.google.com/document/d/14M4OpB2WEbd4WrB5EWZxAnyo1IblSaN9ZnX3zm1gqaU/edit?usp=drivesdk",
+          "review_set_id": "36a297433e8caff1a5517b979616b873",
+          "generation": 1,
+          "operation_id": "b435ec17ffe6c8298275d6441297e079",
+          "publish_status": "ready",
+          "remote_version": "8",
+          "docs_revision": "AIroW36C8fZ15WlPtp_B92s6XajtErCkKs5XmBCwWwi6TExdjOiNJBTG8cTmjJflczHabMNiUnF_goIwzOvYntoMtxWX0fgOaAVo_bB_30o",
+          "modified_time": "2026-08-04T05:36:33.667Z",
+          "published_at": "2026-08-04T05:36:37.48193Z",
+          "review_snapshot": {
+            "version": 1,
+            "manifest_hash": "18410ca09f9e08e1ce169541da9174d90c0c388281f70de2a3dbfea1b7719ff1",
+            "baseline_hash": "2babbb900b0508ad829f408b00e4befeaecb91d2ca18f59800107a0eee8780da",
+            "captured_revision": "AIroW36C8fZ15WlPtp_B92s6XajtErCkKs5XmBCwWwi6TExdjOiNJBTG8cTmjJflczHabMNiUnF_goIwzOvYntoMtxWX0fgOaAVo_bB_30o",
+            "activated_revision": "AIroW36C8fZ15WlPtp_B92s6XajtErCkKs5XmBCwWwi6TExdjOiNJBTG8cTmjJflczHabMNiUnF_goIwzOvYntoMtxWX0fgOaAVo_bB_30o"
+          }
+        },
+        {
+          "file_id": "1Ov2yZQpUSEcP018P-XdV5GKU_ADcGroVQCWyPYu_rvw",
+          "url": "https://docs.google.com/document/d/1Ov2yZQpUSEcP018P-XdV5GKU_ADcGroVQCWyPYu_rvw/edit?usp=drivesdk",
+          "review_set_id": "05a9889bb1a9fe2f10b99aa1da04d6fa",
+          "generation": 2,
+          "operation_id": "534f16ad543fe703f18e7ea608ba24ee",
+          "publish_status": "ready",
+          "remote_version": "8",
+          "docs_revision": "AIroW35ixy5L4H8uyHDkdPAIPLsPOCeaqZqI9K21bJCaN8gBHzg4E4GIMXoaLnpsG5XR7o8CbfYQoid-CTnc0rmddlTD5sg4J3nZqOib7pY",
+          "modified_time": "2026-08-04T05:51:21.514Z",
+          "published_at": "2026-08-04T05:51:24.301108Z",
+          "review_snapshot": {
+            "version": 1,
+            "manifest_hash": "4d6a764f62284c1886c1e61c100caf3685be6684fb8bdbc2abe852b3e87fd594",
+            "baseline_hash": "2babbb900b0508ad829f408b00e4befeaecb91d2ca18f59800107a0eee8780da",
+            "captured_revision": "AIroW35ixy5L4H8uyHDkdPAIPLsPOCeaqZqI9K21bJCaN8gBHzg4E4GIMXoaLnpsG5XR7o8CbfYQoid-CTnc0rmddlTD5sg4J3nZqOib7pY",
+            "activated_revision": "AIroW35ixy5L4H8uyHDkdPAIPLsPOCeaqZqI9K21bJCaN8gBHzg4E4GIMXoaLnpsG5XR7o8CbfYQoid-CTnc0rmddlTD5sg4J3nZqOib7pY"
+          }
+        }
+      ]
+    }
+  }
+}

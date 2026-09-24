@@ -1,0 +1,43 @@
+version: 3
+project_id: policy-manual-fixture
+default_profile: review
+profiles:
+  review:
+    sources:
+      include: [policies/*.md]
+    entry: policy-manual
+    field_defaults:
+      organization: Example Cooperative
+      effective_date: 2026-08-01
+    publications:
+      policy-manual:
+        kind: bundle
+        title: Policy Manual
+        members:
+          - source: policies/conduct.md
+            start: after_cover
+          - source: policies/security.md
+            start: odd_page
+        layout:
+          cover:
+            enabled: true
+            title: '{{ field "organization" }} Policy Manual'
+            fields:
+              - key: effective_date
+                label: Effective date
+                format: date
+          table_of_contents:
+            enabled: true
+            mode: static
+            depth: 2
+          page:
+            size: letter
+            margins:
+              top: 1in
+              right: 1in
+              bottom: 1in
+              left: 1in
+    destination:
+      staging_folder_name: Fixture Staging
+      review_folder_name: Fixture Review
+    state_file: state.json

@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="480" height="160" viewBox="0 0 480 160" role="img" aria-labelledby="title desc">
+  <title id="title">Synthetic publishing probe</title>
+  <desc id="desc">A source box points to a review box.</desc>
+  <rect width="480" height="160" fill="#ffffff"/>
+  <rect x="28" y="48" width="140" height="64" rx="8" fill="#e8f0fe" stroke="#174ea6" stroke-width="2"/>
+  <text x="98" y="86" text-anchor="middle" font-family="Arial, sans-serif" font-size="18" fill="#174ea6">Source</text>
+  <path d="M184 80 H292" stroke="#3c4043" stroke-width="4"/>
+  <path d="M276 66 L296 80 L276 94" fill="none" stroke="#3c4043" stroke-width="4"/>
+  <rect x="312" y="48" width="140" height="64" rx="8" fill="#e6f4ea" stroke="#137333" stroke-width="2"/>
+  <text x="382" y="86" text-anchor="middle" font-family="Arial, sans-serif" font-size="18" fill="#137333">Review</text>
+</svg>

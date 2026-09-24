@@ -1,0 +1,40 @@
+version: 3
+project_id: software-delivery-fixture
+default_profile: review
+profiles:
+  review:
+    sources:
+      include: [docs/*.md]
+    entry: engineering-handbook
+    field_defaults:
+      product: Atlas
+      release: 2026.08
+    publications:
+      engineering-handbook:
+        kind: bundle
+        title: Engineering Handbook
+        members:
+          - source: docs/overview.md
+            start: after_cover
+          - source: docs/architecture.md
+            start: new_page
+        layout:
+          cover:
+            enabled: true
+            title: '{{ field "product" }} Engineering Handbook'
+            fields:
+              - key: release
+                label: Release
+          table_of_contents:
+            enabled: true
+            mode: static
+            depth: 3
+          footer:
+            right: 'Page {{ page "number" }} of {{ page "count" }}'
+      release-notes:
+        kind: source
+        source: docs/release.md
+    destination:
+      staging_folder_name: Fixture Staging
+      review_folder_name: Fixture Review
+    state_file: state.json

@@ -1,0 +1,12 @@
+version: 1
+workspace_id: momentum-electrical
+profiles:
+  work:
+    sources:
+      - docs/engagement/*.md
+    entry: docs/engagement/README.md
+    review_folder_name: Momentum Review
+    staging_folder_name: Momentum Staging
+    reference_docx: document-styles/work-reference.docx
+    max_table_columns: 5
+    state_file: .private/mdoc-state.json

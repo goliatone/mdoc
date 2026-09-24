@@ -1,0 +1,18 @@
+{
+  "schema_version": 2,
+  "kind": "plan",
+  "result": "ok",
+  "items": [
+    {
+      "target": "publication:report",
+      "publication_id": "report",
+      "publication_kind": "bundle",
+      "member_count": 3,
+      "action": "create"
+    }
+  ],
+  "counts": {
+    "create": 1
+  },
+  "blocked": false
+}
