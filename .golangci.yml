@@ -1,0 +1,137 @@
+version: "2"
+
+run:
+  timeout: 5m
+  tests: true
+  modules-download-mode: readonly
+  relative-path-mode: gitroot
+  allow-parallel-runners: true
+
+linters:
+  default: none
+  enable:
+    - bodyclose
+    - dupl
+    - durationcheck
+    - errchkjson
+    - errcheck
+    - errorlint
+    - funlen
+    - gocyclo
+    - govet
+    - ineffassign
+    - nestif
+    - nilerr
+    - nilnesserr
+    - noctx
+    - nolintlint
+    - nosprintfhostport
+    - rowserrcheck
+    - sqlclosecheck
+    - staticcheck
+    - tagliatelle
+    - testifylint
+    - unconvert
+    - unused
+    - usestdlibvars
+  settings:
+    dupl:
+      threshold: 120
+    errcheck:
+      check-type-assertions: true
+      check-blank: true
+      exclude-functions:
+        # AsType returns the matched error as data; its bool reports the match.
+        - errors.AsType
+    funlen:
+      lines: 90
+      statements: 45
+      ignore-comments: true
+    gocyclo:
+      min-complexity: 15
+    nestif:
+      min-complexity: 5
+    govet:
+      enable:
+        - shadow
+    nolintlint:
+      require-explanation: true
+      require-specific: true
+      allow-unused: false
+    tagliatelle:
+      case:
+        rules:
+          json: snake
+          yaml: snake
+          toml: snake
+          mapstructure: snake
+    testifylint:
+      enable-all: true
+  exclusions:
+    generated: strict
+    warn-unused: true
+    paths:
+      # npm dependencies may contain Go examples outside our maintained modules.
+      - (^|/)node_modules/
+    presets:
+      - comments
+      - common-false-positives
+    rules:
+      - path: _test\.go
+        linters:
+          - dupl
+          - funlen
+          - gocyclo
+          - nestif
+      # Existing translation and preference fixtures intentionally remain a
+      # separate cleanup slice. Their exact backlog is tracked as CQ-012.
+      - path: ^admin/boot_bindings_translation_test\.go$
+        linters:
+          - errcheck
+      - path: ^admin/preferences_test\.go$
+        linters:
+          - errchkjson
+          - errcheck
+          - noctx
+          - usestdlibvars
+      - path: ^admin/translation_capabilities_test\.go$
+        linters:
+          - errcheck
+      - path: ^admin/translation_matrix_binding_test\.go$
+        linters:
+          - bodyclose
+          - errcheck
+          - noctx
+      - path: ^admin/translation_queue_binding_test\.go$
+        linters:
+          - govet
+      # The web example predates the repository lint gate. Its remaining
+      # backlog is tracked as CQ-011 in REFACTORING_REPORT.md. Keep only the
+      # checks with known findings excluded; all other checks run normally.
+      - path: ^examples/web/
+        linters:
+          - dupl
+          - errcheck
+          - funlen
+          - gocyclo
+          - govet
+          - nestif
+          - staticcheck
+          - unused
+formatters:
+  enable:
+    - gofmt
+  exclusions:
+    generated: strict
+
+issues:
+  max-issues-per-linter: 0
+  max-same-issues: 0
+
+output:
+  formats:
+    text:
+      path: stdout
+      print-linter-name: true
+      print-issued-lines: true
+      colors: false

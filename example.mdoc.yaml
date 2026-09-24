@@ -1,0 +1,111 @@
+version: 3
+project_id: example-project
+default_profile: default
+root: .
+pandoc_binary: pandoc
+output:
+  format: human
+  quiet: false
+profiles:
+  default:
+    sources:
+      include: [README.md]
+      exclude: []
+      external_roots: []
+    entry: main-bundle
+    field_defaults:
+      classification: Internal
+    publications:
+      main-bundle:
+        kind: bundle
+        title: Main Bundle
+        review:
+          pull:
+            enabled: true
+        reference_links:
+          - id: product-name
+            pattern: '\bmdoc\b'
+            definition:
+              source: README.md
+              match: heading_prefix
+            unresolved: error
+        members:
+          - source: README.md
+            start: after_cover
+        fields: {}
+        layout:
+          cover:
+            enabled: true
+            title: Main Bundle
+            fields:
+              - key: classification
+                label: Classification
+          table_of_contents:
+            enabled: true
+            mode: static
+            title: Contents
+            depth: 1
+          page:
+            size: letter
+            orientation: portrait
+            margins:
+              top: 1in
+              right: 1in
+              bottom: 1in
+              left: 1in
+          footer:
+            mode: override
+            default:
+              right: 'Page {{ page "number" }} of {{ page "count" }}'
+          headings:
+            member_title_level: 1
+            keep_with_next: true
+          tables:
+            repeat_header_rows: true
+            wide_table_columns: 5
+            wide_table: warning
+            preserve_width_styles: [Metadata Grid]
+      main-document:
+        kind: source
+        title: Main Document
+        source: README.md
+        review:
+          pull:
+            enabled: true
+        fields: {}
+        layout:
+          cover:
+            enabled: false
+          table_of_contents:
+            enabled: false
+          page:
+            size: letter
+            orientation: portrait
+            margins:
+              top: 1in
+              right: 1in
+              bottom: 1in
+              left: 1in
+    naming:
+      source: file
+      mapping: {}
+    validation:
+      title: optional
+      heading_jumps: warning
+      unpublished_markdown_links: warning
+      max_table_columns: 5
+      image_types: [png, jpg, jpeg, svg]
+    style:
+      reference_docx: ""
+      heading_filter: none
+      filters: []
+      roots: []
+      reader: gfm
+    destination:
+      mode: immutable_review
+      parent_folder_id: ""
+      staging_folder_id: ""
+      review_folder_id: ""
+      staging_folder_name: Documents Staging
+      review_folder_name: Documents Review
+    state_file: ""
