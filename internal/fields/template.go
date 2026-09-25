@@ -4,8 +4,10 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"maps"
 	"math/big"
 	"reflect"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -196,9 +198,7 @@ func (e templateEvaluator) rangeNode(node *parse.RangeNode, dot any) ([]Segment,
 
 func (e templateEvaluator) clone() templateEvaluator {
 	variables := make(map[string]any, len(e.variables))
-	for key, value := range e.variables {
-		variables[key] = value
-	}
+	maps.Copy(variables, e.variables)
 	e.variables = variables
 	return e
 }
@@ -380,10 +380,8 @@ func (e templateEvaluator) call(name string, arguments []any) (any, error) {
 		}
 		return true, nil
 	case "or":
-		for _, argument := range arguments {
-			if truth(argument) {
-				return true, nil
-			}
+		if slices.ContainsFunc(arguments, truth) {
+			return true, nil
 		}
 		return false, nil
 	case "not":
@@ -675,10 +673,7 @@ func exactDecimalString(value *big.Rat) (string, bool) {
 	if denominator.Cmp(big.NewInt(1)) != 0 {
 		return "", false
 	}
-	decimals := twos
-	if fives > decimals {
-		decimals = fives
-	}
+	decimals := max(fives, twos)
 	formatted := value.FloatString(decimals)
 	if strings.Contains(formatted, ".") {
 		formatted = strings.TrimRight(strings.TrimRight(formatted, "0"), ".")

@@ -529,8 +529,8 @@ func migrateStateTargets(value *State) error {
 func populateLegacyDocuments(value *State) {
 	value.Documents = map[string]Document{}
 	for key, document := range value.Targets {
-		if strings.HasPrefix(key, "source:") {
-			value.Documents[strings.TrimPrefix(key, "source:")] = document
+		if after, ok := strings.CutPrefix(key, "source:"); ok {
+			value.Documents[after] = document
 		}
 	}
 }

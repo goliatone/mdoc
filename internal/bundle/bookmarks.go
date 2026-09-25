@@ -109,10 +109,3 @@ func asciiSlug(value string) string {
 	}
 	return strings.Trim(builder.String(), "_")
 }
-
-func min(left, right int) int {
-	if left < right {
-		return left
-	}
-	return right
-}

@@ -36,7 +36,7 @@ func buildCover(target *publication.Publication, values, computed map[string]any
 		if err != nil {
 			return nil, err
 		}
-		for _, paragraph := range strings.Split(prose, "\n\n") {
+		for paragraph := range strings.SplitSeq(prose, "\n\n") {
 			if strings.TrimSpace(paragraph) != "" {
 				blocks = append(blocks, styledParagraph("Cover Prose", paragraph))
 			}

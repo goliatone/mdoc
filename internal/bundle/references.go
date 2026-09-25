@@ -2,6 +2,7 @@ package bundle
 
 import (
 	"fmt"
+	"maps"
 	"regexp"
 	"strings"
 
@@ -423,9 +424,7 @@ func asInlineList(value any) []any {
 
 func cloneInlineContainer(node map[string]any, children []any) map[string]any {
 	clone := make(map[string]any, len(node))
-	for key, value := range node {
-		clone[key] = value
-	}
+	maps.Copy(clone, node)
 	if node["t"] == "Span" {
 		content := append([]any(nil), asInlineList(node["c"])...)
 		content[1] = children

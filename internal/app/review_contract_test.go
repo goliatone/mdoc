@@ -30,8 +30,7 @@ func TestSelectReviewPublicationDefaultsToEntryAndRejectsUnsafeTargets(t *testin
 }
 
 func errorCode(err error) string {
-	var typed *Error
-	if errors.As(err, &typed) {
+	if typed, ok := errors.AsType[*Error](err); ok {
 		return typed.Code
 	}
 	return ""

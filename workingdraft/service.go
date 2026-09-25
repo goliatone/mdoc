@@ -102,8 +102,7 @@ func safeError(err error) error {
 	if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
 		return &Error{Code: TransportUnavailable, Message: "Google request canceled or timed out", Retryable: true}
 	}
-	var ge *gapi.Error
-	if errors.As(err, &ge) {
+	if ge, ok := errors.AsType[*gapi.Error](err); ok {
 		switch ge.Code {
 		case 401:
 			return fail(AccountUnavailable, "Google authorization expired; reconnect the account")

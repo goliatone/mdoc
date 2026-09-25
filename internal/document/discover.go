@@ -36,8 +36,7 @@ func (r CommandRunner) PandocJSON(ctx context.Context, path string) ([]byte, err
 	command := exec.CommandContext(ctx, binary, "--from="+reader, "--to=json", path)
 	output, err := command.Output()
 	if err != nil {
-		var exit *exec.ExitError
-		if errors.As(err, &exit) {
+		if exit, ok := errors.AsType[*exec.ExitError](err); ok {
 			return nil, fmt.Errorf("pandoc failed for %s: %s", path, strings.TrimSpace(string(exit.Stderr)))
 		}
 		return nil, fmt.Errorf("run pandoc for %s: %w", path, err)
@@ -289,7 +288,7 @@ func caseMatches(root, path string) bool {
 		return false
 	}
 	current := root
-	for _, part := range strings.Split(relative, string(filepath.Separator)) {
+	for part := range strings.SplitSeq(relative, string(filepath.Separator)) {
 		entries, err := os.ReadDir(current)
 		if err != nil {
 			return false

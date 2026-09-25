@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"io"
+	"maps"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -123,9 +124,7 @@ func (f *batchDrive) GetFile(_ context.Context, id string) (googleapi.File, erro
 func (f *batchDrive) UpdateProperties(_ context.Context, id string, properties map[string]string) (googleapi.File, error) {
 	f.propertyCalls[id]++
 	file := f.files[id]
-	for key, value := range properties {
-		file.AppProperties[key] = value
-	}
+	maps.Copy(file.AppProperties, properties)
 	file.Version = increment(file.Version)
 	f.files[id] = file
 	if f.failPropertyAfter > 0 {
@@ -1566,9 +1565,7 @@ func linkedBatch(placeholder string) BatchRequest {
 }
 func copyProperties(input map[string]string) map[string]string {
 	result := map[string]string{}
-	for key, value := range input {
-		result[key] = value
-	}
+	maps.Copy(result, input)
 	return result
 }
 func copyLinks(input map[string][]googleapi.TextRange) map[string][]googleapi.TextRange {

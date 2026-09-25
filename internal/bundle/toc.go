@@ -3,6 +3,7 @@ package bundle
 import (
 	"encoding/json"
 	"fmt"
+	"slices"
 	"strings"
 
 	"github.com/goliatone/mdoc/internal/config"
@@ -67,12 +68,7 @@ func tocHeadingIncluded(toc config.TOCConfig, sourceKey string, heading headingR
 }
 
 func containsString(values []string, target string) bool {
-	for _, value := range values {
-		if value == target {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(values, target)
 }
 
 func Finalize(topology Topology, layout config.LayoutConfig, filtered []byte) ([]byte, error) {

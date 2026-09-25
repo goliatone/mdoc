@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"os/exec"
 	"regexp"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -83,7 +84,7 @@ type SourceMapEntry struct {
 	Fingerprint     string           `json:"fingerprint"`
 	Signature       string           `json:"signature"`
 	VisibleText     string           `json:"visible_text,omitempty"`
-	SourceRange     ByteRange        `json:"source_range,omitempty"`
+	SourceRange     ByteRange        `json:"source_range"`
 	Occurrence      int              `json:"occurrence,omitempty"`
 	Eligible        bool             `json:"eligible"`
 	Generated       bool             `json:"generated"`
@@ -121,8 +122,7 @@ func (p PandocParser) Parse(ctx context.Context, reader string, source []byte, s
 	command.Stdin = bytes.NewReader(source)
 	output, err := command.Output()
 	if err != nil {
-		var exit *exec.ExitError
-		if errors.As(err, &exit) {
+		if exit, ok := errors.AsType[*exec.ExitError](err); ok {
 			return nil, fmt.Errorf("pandoc source map parse failed: %s", strings.TrimSpace(string(exit.Stderr)))
 		}
 		return nil, fmt.Errorf("run pandoc source map parse: %w", err)
@@ -132,12 +132,7 @@ func (p PandocParser) Parse(ctx context.Context, reader string, source []byte, s
 
 func readerHasExtension(reader, extension string) bool {
 	parts := strings.FieldsFunc(reader, func(r rune) bool { return r == '+' || r == '-' })
-	for _, part := range parts[1:] {
-		if part == extension {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(parts[1:], extension)
 }
 
 func ParseMember(ctx context.Context, parser Parser, reader string, member MemberInput) ([]Block, error) {
@@ -874,7 +869,7 @@ func PositionToByteRange(source []byte, position SourcePosition) (ByteRange, err
 func indexLines(source []byte) []sourceLine {
 	lines := []sourceLine{}
 	start := 0
-	for index := 0; index < len(source); index++ {
+	for index := range source {
 		if source[index] != '\n' {
 			continue
 		}
@@ -923,7 +918,7 @@ func InsertionNewline(source []byte, offset int) (string, error) {
 		return "", errors.New("source is not valid UTF-8")
 	}
 	styles := map[string]bool{}
-	for index := 0; index < len(source); index++ {
+	for index := range source {
 		if source[index] != '\n' {
 			continue
 		}

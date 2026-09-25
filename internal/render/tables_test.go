@@ -343,7 +343,7 @@ func paragraphWithStyle(style, text string) string {
 func tableXML(columns int) string {
 	var grid strings.Builder
 	var cells strings.Builder
-	for index := 0; index < columns; index++ {
+	for range columns {
 		grid.WriteString(`<w:gridCol w:w="1000"/>`)
 		cells.WriteString(`<w:tc><w:p><w:r><w:t>Cell</w:t></w:r></w:p></w:tc>`)
 	}

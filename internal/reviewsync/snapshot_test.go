@@ -104,14 +104,12 @@ func TestConcurrentSnapshotCandidatesLeaveOneValidGeneration(t *testing.T) {
 	start := make(chan struct{})
 	errorsSeen := make(chan error, writers)
 	var group sync.WaitGroup
-	for index := 0; index < writers; index++ {
-		group.Add(1)
-		go func() {
-			defer group.Done()
+	for range writers {
+		group.Go(func() {
 			<-start
 			_, err := store.WriteCandidate(input)
 			errorsSeen <- err
-		}()
+		})
 	}
 	close(start)
 	group.Wait()

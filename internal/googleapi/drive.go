@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"maps"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -394,12 +396,7 @@ func conflict(operation, message string) error {
 }
 
 func containsString(values []string, expected string) bool {
-	for _, value := range values {
-		if value == expected {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(values, expected)
 }
 
 func containsFold(values []string, expected string) bool {
@@ -443,8 +440,6 @@ func fileFromDrive(file *drive.File) File {
 
 func cloneMap(input map[string]string) map[string]string {
 	result := make(map[string]string, len(input))
-	for key, value := range input {
-		result[key] = value
-	}
+	maps.Copy(result, input)
 	return result
 }

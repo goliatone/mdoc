@@ -638,8 +638,7 @@ func Execute(args []string, stdout, stderr io.Writer, authService AuthService, s
 		return &UsageError{Err: err}
 	}
 	if err := parsed.Run(&Runtime{Context: context.Background(), App: appService, Auth: authService, Probe: probeService, Out: stdout, Explicit: explicitFlags(args)}); err != nil {
-		var parseErr *kong.ParseError
-		if errors.As(err, &parseErr) {
+		if _, ok := errors.AsType[*kong.ParseError](err); ok {
 			return &UsageError{Err: err}
 		}
 		return err
@@ -661,8 +660,7 @@ func yesNo(value bool) string {
 }
 
 func ExitCode(err error) int {
-	var usageErr *UsageError
-	if errors.As(err, &usageErr) {
+	if _, ok := errors.AsType[*UsageError](err); ok {
 		return 2
 	}
 	return app.ExitCode(err)
@@ -682,14 +680,12 @@ func WriteError(writer io.Writer, err error, jsonOutput bool) {
 		return
 	}
 	result := ErrorOutput{Class: "command", Code: "command_failed", Message: err.Error(), ExitCode: ExitCode(err)}
-	var typed *app.Error
-	if errors.As(err, &typed) {
+	if typed, ok := errors.AsType[*app.Error](err); ok {
 		result.Class = string(typed.Class)
 		result.Code = typed.Code
 		result.Recovery = typed.Recovery
 	}
-	var usage *UsageError
-	if errors.As(err, &usage) {
+	if _, ok := errors.AsType[*UsageError](err); ok {
 		result.Code = "usage_error"
 	}
 	_ = writeJSON(writer, result)

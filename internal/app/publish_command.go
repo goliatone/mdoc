@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"maps"
 	"path/filepath"
 	"sort"
 	"strconv"
@@ -115,9 +116,7 @@ func (a *Application) Publish(ctx context.Context, options PublishOptions) error
 			if inspectErr != nil {
 				return inspectErr
 			}
-			for key, remote := range additional {
-				remotes[key] = remote
-			}
+			maps.Copy(remotes, additional)
 		}
 	}
 	plan := planner.Build(planner.Input{Local: locals, State: publishState, Remote: remotes, Selected: selected, NewReview: options.NewReview, ExpectedReviewFolder: publishState.Folders.ReviewID})

@@ -78,7 +78,6 @@ func TestLiveReviewPullProseCommentsAndConcurrency(t *testing.T) {
 		}
 	})
 	for _, replacement := range replacements {
-		replacement := replacement
 		t.Run(replacement.name, func(t *testing.T) {
 			applyLiveTextReplacements(t, target.docs, target.fileID, [][2]string{{replacement.old, replacement.new}})
 			t.Cleanup(func() {

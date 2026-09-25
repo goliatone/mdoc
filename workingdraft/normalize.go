@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/url"
 	"reflect"
+	"slices"
 	"strconv"
 	"strings"
 	"unicode"
@@ -45,10 +46,8 @@ func hasSuggestions(value any) bool {
 			}
 		}
 	case []any:
-		for _, item := range v {
-			if hasSuggestions(item) {
-				return true
-			}
+		if slices.ContainsFunc(v, hasSuggestions) {
+			return true
 		}
 	}
 	return false

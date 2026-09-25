@@ -77,8 +77,7 @@ func TestStatusOutputContainsNoTokenFields(t *testing.T) {
 
 func TestUsageError(t *testing.T) {
 	err := Execute([]string{"auth", "unknown"}, &strings.Builder{}, &strings.Builder{}, &fakeAuth{})
-	var usageErr *UsageError
-	if !errors.As(err, &usageErr) {
+	if _, ok := errors.AsType[*UsageError](err); !ok {
 		t.Fatalf("error = %v", err)
 	}
 }
@@ -91,7 +90,7 @@ func TestBundleSelectorIsShownAndForwarded(t *testing.T) {
 	if service.validateOptions.Bundle != "report" {
 		t.Fatalf("bundle option = %q", service.validateOptions.Bundle)
 	}
-	field, ok := reflect.TypeOf(CommonFlags{}).FieldByName("Bundle")
+	field, ok := reflect.TypeFor[CommonFlags]().FieldByName("Bundle")
 	if !ok || field.Tag.Get("name") != "bundle" || !strings.Contains(field.Tag.Get("help"), "bundle publication") {
 		t.Fatalf("bundle help tag = %q", field.Tag)
 	}
@@ -201,8 +200,7 @@ func TestReviewBootstrapRequiresDocumentAndRejectsOverwriteWithoutOutput(t *test
 		{"review", "bootstrap", "--document", "doc-123", "--partial"},
 	} {
 		err := Execute(arguments, &strings.Builder{}, &strings.Builder{}, &fakeAuth{}, &fakeApp{})
-		var usage *UsageError
-		if !errors.As(err, &usage) {
+		if _, ok := errors.AsType[*UsageError](err); !ok {
 			t.Fatalf("%v error = %v", arguments, err)
 		}
 	}

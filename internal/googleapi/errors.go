@@ -58,8 +58,7 @@ func classify(operation string, err error) error {
 	if errors.Is(err, io.EOF) || errors.Is(err, io.ErrUnexpectedEOF) || errors.As(err, &networkError) {
 		kind = KindRetryable
 	}
-	var apiError *googleapi.Error
-	if errors.As(err, &apiError) {
+	if apiError, ok := errors.AsType[*googleapi.Error](err); ok {
 		switch apiError.Code {
 		case http.StatusNotFound:
 			kind = KindNotFound

@@ -181,10 +181,8 @@ func TestStoreLockRejectsConcurrentContenders(t *testing.T) {
 	start := make(chan struct{})
 	results := make(chan error, contenders)
 	var group sync.WaitGroup
-	for index := 0; index < contenders; index++ {
-		group.Add(1)
-		go func() {
-			defer group.Done()
+	for range contenders {
+		group.Go(func() {
 			<-start
 			store := NewStore(path)
 			err := store.Acquire()
@@ -192,7 +190,7 @@ func TestStoreLockRejectsConcurrentContenders(t *testing.T) {
 				_ = store.Release()
 			}
 			results <- err
-		}()
+		})
 	}
 	close(start)
 	group.Wait()

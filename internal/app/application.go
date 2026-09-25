@@ -411,8 +411,7 @@ func (a *Application) renderer(cfg *config.Config) render.Renderer {
 }
 
 func googleError(err error) error {
-	var remote *googleapi.Error
-	if errors.As(err, &remote) {
+	if remote, ok := errors.AsType[*googleapi.Error](err); ok {
 		switch remote.Kind {
 		case googleapi.KindPermission:
 			return WrapError(ClassAuthentication, "google_permission", remote.Error(), err)

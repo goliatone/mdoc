@@ -308,8 +308,8 @@ func auditDOCXConformance(parts map[string][]byte, documentXML []byte) error {
 			}
 			targetValue := relationship.SelectAttrValue("Target", "")
 			var target string
-			if strings.HasPrefix(targetValue, "/") {
-				target = path.Clean(strings.TrimPrefix(targetValue, "/"))
+			if after, ok := strings.CutPrefix(targetValue, "/"); ok {
+				target = path.Clean(after)
 			} else {
 				target = path.Clean(path.Join("word", targetValue))
 			}
@@ -453,8 +453,8 @@ func auditPackageRelationships(parts map[string][]byte) error {
 			}
 			targetValue := relationship.SelectAttrValue("Target", "")
 			var target string
-			if strings.HasPrefix(targetValue, "/") {
-				target = path.Clean(strings.TrimPrefix(targetValue, "/"))
+			if after, ok := strings.CutPrefix(targetValue, "/"); ok {
+				target = path.Clean(after)
 			} else {
 				target = path.Clean(path.Join(base, targetValue))
 			}

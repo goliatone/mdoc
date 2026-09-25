@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -198,8 +199,7 @@ func (s *Service) Status(ctx context.Context) (Status, error) {
 	if credentialsErr == nil {
 		result.Configured = true
 	} else {
-		var missing *MissingCredentialsError
-		if errors.As(credentialsErr, &missing) {
+		if missing, ok := errors.AsType[*MissingCredentialsError](credentialsErr); ok {
 			result.Missing = append([]string(nil), missing.Names...)
 		} else {
 			return Status{}, credentialsErr
@@ -355,10 +355,8 @@ func shutdownServer(server *http.Server) {
 }
 
 func safeOAuthError(value string) string {
-	for _, allowed := range []string{"access_denied", "admin_policy_enforced", "org_internal", "temporarily_unavailable"} {
-		if value == allowed {
-			return value
-		}
+	if slices.Contains([]string{"access_denied", "admin_policy_enforced", "org_internal", "temporarily_unavailable"}, value) {
+		return value
 	}
 	return "authorization_error"
 }

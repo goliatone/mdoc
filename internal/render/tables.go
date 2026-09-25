@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"html"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 	"unicode/utf8"
@@ -266,10 +267,7 @@ func tableContentWeightElements(table *etree.Element, columns int) []int64 {
 		for _, cell := range rowCells(row) {
 			span := cellGridSpan(cell)
 			if span == 1 && column < len(weights) {
-				length := int64(utf8.RuneCountInString(strings.TrimSpace(cellText(cell))))
-				if length < 8 {
-					length = 8
-				}
+				length := max(int64(utf8.RuneCountInString(strings.TrimSpace(cellText(cell)))), 8)
 				if length > 48 {
 					length = 48
 				}
@@ -570,8 +568,8 @@ func wrapWideTablesInLandscapeDocument(document *etree.Document, threshold int) 
 	for section, sectionGroups := range bySection {
 		original := section.Copy()
 		stripFirstSectionSettingsElement(section)
-		for index := len(sectionGroups) - 1; index >= 0; index-- {
-			group := sectionGroups[index]
+		for index, group := range slices.Backward(sectionGroups) {
+
 			firstInSection := index == 0
 			beforeSection := section.Copy()
 			if firstInSection {

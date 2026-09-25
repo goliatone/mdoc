@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
+	"maps"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -590,9 +591,7 @@ func activationEqual(left, right ActivationSeal) bool {
 
 func cloneStringMap(input map[string]string) map[string]string {
 	result := make(map[string]string, len(input))
-	for key, value := range input {
-		result[key] = value
-	}
+	maps.Copy(result, input)
 	return result
 }
 

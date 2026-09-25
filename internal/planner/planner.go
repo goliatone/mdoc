@@ -2,6 +2,7 @@ package planner
 
 import (
 	"fmt"
+	"slices"
 	"sort"
 
 	"github.com/goliatone/mdoc/internal/state"
@@ -313,12 +314,9 @@ func inboundClosure(locals map[string]LocalDocument, roots map[string]bool) map[
 			if closure[source] {
 				continue
 			}
-			for _, outbound := range local.Outbound {
-				if outbound == target {
-					closure[source] = true
-					queue = append(queue, source)
-					break
-				}
+			if slices.Contains(local.Outbound, target) {
+				closure[source] = true
+				queue = append(queue, source)
 			}
 		}
 	}

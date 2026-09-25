@@ -423,8 +423,7 @@ func currentReviewSources(target *publication.Publication, members []reviewsync.
 }
 
 func reviewReadError(err error) error {
-	var remote *googleapi.Error
-	if errors.As(err, &remote) {
+	if remote, ok := errors.AsType[*googleapi.Error](err); ok {
 		switch remote.Kind {
 		case googleapi.KindSuggestions:
 			return WrapError(ClassConflict, string(ReviewCodeSuggestionsOpen), remote.Error(), err)

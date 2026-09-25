@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"regexp/syntax"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -444,12 +445,7 @@ func referencePatternCanMatchEmpty(expression *syntax.Regexp) bool {
 		}
 		return true
 	case syntax.OpAlternate:
-		for _, child := range expression.Sub {
-			if referencePatternCanMatchEmpty(child) {
-				return true
-			}
-		}
-		return false
+		return slices.ContainsFunc(expression.Sub, referencePatternCanMatchEmpty)
 	default:
 		return false
 	}
@@ -739,12 +735,7 @@ func parseLayoutTwips(value string) (int64, error) {
 }
 
 func oneOf(value string, allowed ...string) bool {
-	for _, candidate := range allowed {
-		if value == candidate {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(allowed, value)
 }
 
 func (c RuntimeConfig) Identity() string {

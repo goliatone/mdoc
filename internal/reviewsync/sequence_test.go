@@ -11,7 +11,7 @@ func TestSequenceMatchesHandlesLargeUniqueInputs(t *testing.T) {
 	const size = 20000
 	left := make([]string, size)
 	right := make([]string, size)
-	for index := 0; index < size; index++ {
+	for index := range size {
 		left[index] = fmt.Sprintf("item-%d", index)
 		right[index] = left[index]
 	}

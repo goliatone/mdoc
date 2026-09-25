@@ -260,7 +260,7 @@ func (r Renderer) Render(ctx context.Context, request Request) (Result, error) {
 	hash := ComputeHash(hashInput)
 	warnings := []string{}
 	warnings = append(warnings, layoutWarnings...)
-	for _, line := range strings.Split(strings.TrimSpace(stderr.String()), "\n") {
+	for line := range strings.SplitSeq(strings.TrimSpace(stderr.String()), "\n") {
 		if strings.TrimSpace(line) != "" {
 			warnings = append(warnings, line)
 		}

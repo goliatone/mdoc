@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -627,12 +628,9 @@ func publicationInboundClosure(locals []planner.LocalDocument, selected map[stri
 			if result[key] {
 				continue
 			}
-			for _, outbound := range local.Outbound {
-				if outbound == target {
-					result[key] = true
-					queue = append(queue, key)
-					break
-				}
+			if slices.Contains(local.Outbound, target) {
+				result[key] = true
+				queue = append(queue, key)
 			}
 		}
 	}
@@ -685,10 +683,8 @@ func hashJSON(value any) (string, error) {
 }
 
 func appendUnique(values []string, value string) []string {
-	for _, current := range values {
-		if current == value {
-			return values
-		}
+	if slices.Contains(values, value) {
+		return values
 	}
 	return append(values, value)
 }

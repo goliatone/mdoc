@@ -119,8 +119,7 @@ func TestLoginMissingCredentialsDoesNotOpenBrowser(t *testing.T) {
 		}),
 	})
 	_, err := service.Login(context.Background())
-	var missing *MissingCredentialsError
-	if !errors.As(err, &missing) {
+	if _, ok := errors.AsType[*MissingCredentialsError](err); !ok {
 		t.Fatalf("login error = %v", err)
 	}
 	if opened.Load() {

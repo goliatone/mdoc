@@ -30,7 +30,7 @@ type ClassifiedChange struct {
 	Class          ChangeClass      `json:"class"`
 	Operation      ChangeOperation  `json:"operation"`
 	Member         string           `json:"member,omitempty"`
-	SourceRange    ByteRange        `json:"source_range,omitempty"`
+	SourceRange    ByteRange        `json:"source_range"`
 	BaselineStart  int              `json:"baseline_start"`
 	BaselineEnd    int              `json:"baseline_end"`
 	ReviewStart    int              `json:"review_start"`
