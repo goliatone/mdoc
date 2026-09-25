@@ -14,11 +14,8 @@ import (
 	"google.golang.org/api/docs/v1"
 )
 
-func inspect(ref SourceRef, d *docs.Document) Inspection {
+func inspect(ref SourceRef, d *docs.Document, tree map[string]any) Inspection {
 	result := Inspection{Source: ref, Title: d.Title, Capabilities: Capabilities{Discussion: true}, Diagnostics: []Diagnostic{}}
-	raw, _ := json.Marshal(d)
-	var tree any
-	_ = json.Unmarshal(raw, &tree)
 	result.SuggestionsPresent = hasSuggestions(tree)
 	if result.SuggestionsPresent {
 		result.Diagnostics = append(result.Diagnostics, Diagnostic{SuggestionsPending, "accept or reject pending Google suggestions before using the body"})
@@ -86,7 +83,7 @@ func normalize(d *docs.Document) (Content, error) {
 		return Content{}, unsupported("missing body, headers, footers, footnotes or embedded objects")
 	}
 	var blocks []string
-	counts := map[string]map[int64]int64{}
+	lists := listLayout{counts: map[string]map[int64]int64{}}
 	for index, e := range tab.Body.Content {
 		if e == nil {
 			return Content{}, unsupported("unknown body element")
@@ -116,46 +113,22 @@ func normalize(d *docs.Document) (Content, error) {
 				return Content{}, unsupported("unrecognized paragraph style")
 			}
 		}
+		continuation := 0
 		if p.Bullet != nil {
 			if prefix != "" {
 				return Content{}, unsupported("heading list item")
 			}
-			b := p.Bullet
-			list, ok := tab.Lists[b.ListId]
-			if !ok || list.ListProperties == nil || b.NestingLevel < 0 || b.NestingLevel >= int64(len(list.ListProperties.NestingLevels)) {
-				return Content{}, unsupported("unknown list definition")
+			var boundary string
+			var err error
+			prefix, continuation, boundary, err = lists.item(p.Bullet, tab.Lists)
+			if err != nil {
+				return Content{}, err
 			}
-			level := list.ListProperties.NestingLevels[b.NestingLevel]
-			if level == nil {
-				return Content{}, unsupported("unknown list level")
+			if boundary != "" {
+				blocks = append(blocks, boundary)
 			}
-			if counts[b.ListId] == nil {
-				counts[b.ListId] = map[int64]int64{}
-			}
-			marker := "- "
-			if level.GlyphType == "DECIMAL" {
-				if level.GlyphFormat != "" && level.GlyphFormat != fmt.Sprintf("%%%d.", b.NestingLevel) {
-					return Content{}, unsupported("custom numbered list format")
-				}
-				n, ok := counts[b.ListId][b.NestingLevel]
-				if !ok {
-					n = level.StartNumber
-					if n <= 0 {
-						n = 1
-					}
-				}
-				marker = strconv.FormatInt(n, 10) + ". "
-				counts[b.ListId][b.NestingLevel] = n + 1
-			} else if (level.GlyphType != "" && level.GlyphType != "GLYPH_TYPE_UNSPECIFIED") || !strings.Contains("●○■•◦▪", level.GlyphSymbol) || level.GlyphSymbol == "" {
-				return Content{}, unsupported("custom list glyph")
-			}
-			for depth := range counts[b.ListId] {
-				if depth > b.NestingLevel {
-					delete(counts[b.ListId], depth)
-				}
-			}
-			prefix = strings.Repeat("    ", int(b.NestingLevel)) + marker
 		}
+
 		var runs []*docs.TextRun
 		for _, element := range p.Elements {
 			if element == nil || element.TextRun == nil {
@@ -170,12 +143,22 @@ func normalize(d *docs.Document) (Content, error) {
 				}
 			}
 			run := *element.TextRun
-			if len(runs) > 0 && reflect.DeepEqual(runs[len(runs)-1].TextStyle, run.TextStyle) {
+			if len(runs) > 0 && reflect.DeepEqual(semanticStyle(runs[len(runs)-1].TextStyle), semanticStyle(run.TextStyle)) {
 				runs[len(runs)-1].Content += run.Content
 			} else {
 				runs = append(runs, &run)
 			}
 		}
+		var authored strings.Builder
+		for _, run := range runs {
+			authored.WriteString(run.Content)
+		}
+		for _, line := range strings.Split(authored.String(), "\n") {
+			if leadingColumns(line) >= 4 {
+				return Content{}, unsupported("literal indentation could become a Markdown code block")
+			}
+		}
+
 		var text strings.Builder
 		for j, run := range runs {
 			value := run.Content
@@ -193,17 +176,17 @@ func normalize(d *docs.Document) (Content, error) {
 					return Content{}, unsupported("internal or unknown link")
 				}
 				u, err := url.Parse(l.Url)
-				if err != nil || (u.Scheme != "http" && u.Scheme != "https" && u.Scheme != "mailto") {
+				if err != nil || strings.ContainsFunc(l.Url, unicode.IsControl) || (u.Scheme != "http" && u.Scheme != "https" && u.Scheme != "mailto") {
 					return Content{}, unsupported("link scheme")
 				}
-				link = strings.NewReplacer("<", "%3C", ">", "%3E", " ", "%20", "\n", "%0A", "\r", "%0D").Replace(l.Url)
+				link = escapeLinkDestination(l.Url)
 			}
 			lines := strings.Split(value, "\n")
 			for k, line := range lines {
 				if k > 0 {
 					text.WriteString("  \n")
 					if p.Bullet != nil {
-						text.WriteString(strings.Repeat("    ", int(p.Bullet.NestingLevel)+1))
+						text.WriteString(strings.Repeat(" ", continuation))
 					}
 				}
 				core := strings.TrimFunc(line, unicode.IsSpace)
@@ -231,6 +214,9 @@ func normalize(d *docs.Document) (Content, error) {
 				text.WriteString(left + core + right)
 			}
 		}
+		if p.Bullet == nil && (prefix != "" || strings.TrimSpace(text.String()) != "") {
+			lists.stack = nil
+		}
 		blocks = append(blocks, prefix+text.String())
 	}
 	return Content{Title: d.Title, Body: strings.Join(blocks, "\n\n") + "\n"}, nil
@@ -238,10 +224,43 @@ func normalize(d *docs.Document) (Content, error) {
 func escapeMarkdown(value string) string {
 	var b strings.Builder
 	for _, r := range value {
-		if strings.ContainsRune("\\`*_{}[]<>#+-.!|~", r) {
+		if strings.ContainsRune("\\`*_{}[]<>#+-.!|~&", r) {
 			b.WriteByte('\\')
 		}
 		b.WriteRune(r)
 	}
 	return b.String()
+}
+
+func ordinaryBullet(symbol string) bool {
+	switch symbol {
+	case "●", "○", "■", "•", "◦", "▪":
+		return true
+	}
+	return false
+}
+func semanticStyle(style *docs.TextStyle) docs.TextStyle {
+	if style == nil {
+		return docs.TextStyle{}
+	}
+	return docs.TextStyle{Bold: style.Bold, Italic: style.Italic, Strikethrough: style.Strikethrough, Underline: style.Underline && style.Link == nil, SmallCaps: style.SmallCaps, BaselineOffset: style.BaselineOffset, Link: style.Link}
+}
+
+func escapeLinkDestination(value string) string {
+	return strings.NewReplacer("\\", "\\\\", "&", "&amp;", "<", "\\<", ">", "\\>").Replace(value)
+}
+
+func leadingColumns(line string) int {
+	columns := 0
+	for _, r := range line {
+		switch r {
+		case ' ':
+			columns++
+		case '\t':
+			columns += 4 - columns%4
+		default:
+			return columns
+		}
+	}
+	return columns
 }

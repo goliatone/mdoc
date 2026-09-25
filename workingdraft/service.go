@@ -2,7 +2,6 @@ package workingdraft
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"net/http"
 	"net/url"
@@ -12,17 +11,17 @@ import (
 
 	transport "github.com/goliatone/mdoc/internal/googleapi"
 	"golang.org/x/oauth2"
-	"google.golang.org/api/docs/v1"
 	"google.golang.org/api/drive/v3"
 	gapi "google.golang.org/api/googleapi"
 )
 
 type Service struct {
-	provider  Provider
-	converter Converter
-	store     SnapshotStore
-	now       func() time.Time
-	attempts  int
+	conversionVersion string
+	provider          Provider
+	converter         Converter
+	store             SnapshotStore
+	now               func() time.Time
+	attempts          int
 }
 
 func New(options Options) (*Service, error) {
@@ -37,6 +36,10 @@ func New(options Options) (*Service, error) {
 	}
 	if options.Converter == nil {
 		options.Converter = nativeConverter{}
+		options.ConversionVersion = ConversionVersion
+	}
+	if options.ConversionVersion == "" {
+		return nil, fail(UnsupportedContent, "an injected converter requires an explicit conversion version")
 	}
 	if options.Provider == nil {
 		if options.HTTPClient == nil && options.TokenSource == nil {
@@ -59,7 +62,7 @@ func New(options Options) (*Service, error) {
 		}
 		options.Provider = provider
 	}
-	return &Service{options.Provider, options.Converter, options.Store, options.Now, options.Attempts}, nil
+	return &Service{provider: options.Provider, converter: options.Converter, store: options.Store, now: options.Now, attempts: options.Attempts, conversionVersion: options.ConversionVersion}, nil
 }
 
 var identityPattern = regexp.MustCompile(`^[A-Za-z0-9_-]+$`)
@@ -99,6 +102,9 @@ func sourceURL(ref SourceRef) string {
 }
 func fail(code ErrorCode, message string) *Error { return &Error{Code: code, Message: message} }
 func safeError(err error) error {
+	if typed, ok := errors.AsType[*Error](err); ok && typed.Code == AccountUnavailable {
+		return fail(AccountUnavailable, "account credentials unavailable; reconnect the account")
+	}
 	if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
 		return &Error{Code: TransportUnavailable, Message: "Google request canceled or timed out", Retryable: true}
 	}
@@ -112,7 +118,7 @@ func safeError(err error) error {
 	}
 	return &Error{Code: TransportUnavailable, Message: "Google request failed", Retryable: true}
 }
-func (s *Service) read(ctx context.Context, ref SourceRef) (*drive.File, *docs.Document, Inspection, error) {
+func (s *Service) read(ctx context.Context, ref SourceRef) (*drive.File, *sourceDocument, Inspection, error) {
 	ref, err := canonicalSource(ref)
 	if err != nil {
 		return nil, nil, Inspection{}, err
@@ -127,14 +133,28 @@ func (s *Service) read(ctx context.Context, ref SourceRef) (*drive.File, *docs.D
 	if f.DriveId != "" {
 		return nil, nil, Inspection{}, fail(UnsupportedContent, "Shared Drive documents are not supported")
 	}
-	d, err := s.provider.Document(ctx, ref.DocumentID)
+	raw, err := s.provider.Document(ctx, ref.DocumentID)
 	if err != nil {
 		return nil, nil, Inspection{}, safeError(err)
 	}
-	if d == nil || d.DocumentId != ref.DocumentID {
+	d, err := prepareDocument(raw)
+	if err != nil {
+		return nil, nil, Inspection{}, err
+	}
+	if d.DocumentId != ref.DocumentID {
 		return nil, nil, Inspection{}, fail(InvalidSource, "Google returned a different document identity")
 	}
-	result := inspect(ref, d)
+	result := inspect(ref, d.Document, d.tree)
+	if d.styleError != nil {
+		result.Supported = false
+		result.Capabilities.Capture = false
+		result.Diagnostics = append(result.Diagnostics, Diagnostic{UnsupportedContent, d.styleError.Error()})
+	}
+	if d.unknown {
+		result.Supported = false
+		result.Capabilities.Capture = false
+		result.Diagnostics = append(result.Diagnostics, Diagnostic{UnsupportedContent, "unrecognized document fields"})
+	}
 	if result.Source.TabID != ref.TabID && ref.TabID != "" {
 		return nil, nil, Inspection{}, fail(InvalidSource, "requested tab does not match the document root tab")
 	}
@@ -150,24 +170,18 @@ func (s *Service) Capture(ctx context.Context, source SourceRef) (Snapshot, erro
 		if err != nil {
 			return Snapshot{}, err
 		}
-		raw, err := json.Marshal(d)
-		if err != nil {
-			return Snapshot{}, fail(UnsupportedContent, "document representation cannot be retained")
-		}
+		raw := d.raw
 		after, afterDoc, afterInspection, err := s.read(ctx, source)
 		if err != nil {
 			return Snapshot{}, err
 		}
-		afterRaw, err := json.Marshal(afterDoc)
-		if err != nil {
-			return Snapshot{}, fail(UnsupportedContent, "document representation cannot be retained")
-		}
+		afterRaw := afterDoc.raw
 		if f.Version != after.Version || f.Name != after.Name || d.RevisionId != afterDoc.RevisionId || string(raw) != string(afterRaw) || i.Source != afterInspection.Source {
 			continue
 		}
-		result := Snapshot{SchemaVersion: SchemaVersion, Source: i.Source, SourceURL: sourceURL(i.Source), Title: d.Title, ProviderRevision: d.RevisionId, ProviderVersion: versionString(f.Version), RetrievedAt: s.now().UTC(), ConversionVersion: ConversionVersion, RawContent: raw, Diagnostics: i.Diagnostics, BodyUsable: i.Supported && !i.SuggestionsPresent}
+		result := Snapshot{SchemaVersion: SchemaVersion, Source: i.Source, SourceURL: sourceURL(i.Source), Title: d.Title, ProviderRevision: d.RevisionId, ProviderVersion: versionString(f.Version), RetrievedAt: s.now().UTC(), ConversionVersion: s.conversionVersion, RawContent: raw, Diagnostics: i.Diagnostics, BodyUsable: i.Supported && !i.SuggestionsPresent}
 		if result.BodyUsable {
-			content, diagnostics, err := s.converter.Convert(ctx, d)
+			content, diagnostics, err := s.converter.Convert(ctx, d.Document)
 			if err != nil {
 				return Snapshot{}, fail(UnsupportedContent, "document conversion failed")
 			}
@@ -179,6 +193,9 @@ func (s *Service) Capture(ctx context.Context, source SourceRef) (Snapshot, erro
 			}
 		}
 		if err := seal(&result); err != nil {
+			return Snapshot{}, err
+		}
+		if err := VerifySnapshot(result); err != nil {
 			return Snapshot{}, err
 		}
 		if s.store != nil {

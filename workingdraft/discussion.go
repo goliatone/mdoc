@@ -2,8 +2,9 @@ package workingdraft
 
 import (
 	"context"
-	"google.golang.org/api/drive/v3"
 	"net/url"
+
+	"google.golang.org/api/drive/v3"
 )
 
 func (s *Service) ReadDiscussion(ctx context.Context, input DiscussionInput) (DiscussionPage, error) {
@@ -55,7 +56,7 @@ func (s *Service) ReadDiscussion(ctx context.Context, input DiscussionInput) (Di
 	return result, nil
 }
 func author(u *drive.User) *Author {
-	if u == nil {
+	if u == nil || u.DisplayName == "" && u.EmailAddress == "" && !u.Me {
 		return nil
 	}
 	return &Author{DisplayName: u.DisplayName, Email: u.EmailAddress, Me: u.Me}

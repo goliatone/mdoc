@@ -7,6 +7,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"strconv"
+	"strings"
 )
 
 func versionString(value int64) string {
@@ -36,7 +37,7 @@ func seal(s *Snapshot) error {
 }
 func VerifySnapshot(s Snapshot) error {
 	canonical, err := canonicalSource(s.Source)
-	if err != nil || canonical != s.Source || s.BodyUsable && s.Source.TabID == "" || s.SchemaVersion != SchemaVersion || s.ConversionVersion != ConversionVersion || s.RetrievedAt.IsZero() || s.SourceURL != sourceURL(s.Source) || !json.Valid(s.RawContent) || s.BodyUsable && (s.Title != s.NormalizedContent.Title || len(s.Diagnostics) != 0) || !s.BodyUsable && s.NormalizedContent != (Content{}) {
+	if err != nil || canonical != s.Source || s.BodyUsable && s.Source.TabID == "" || s.SchemaVersion != SchemaVersion || s.ConversionVersion == "" || s.RetrievedAt.IsZero() || s.SourceURL != sourceURL(s.Source) || !json.Valid(s.RawContent) || containsCapabilities(s.RawContent) || s.BodyUsable && (s.Title != s.NormalizedContent.Title || len(s.Diagnostics) != 0) || !s.BodyUsable && s.NormalizedContent != (Content{}) {
 		return fail(SnapshotCorrupt, "invalid snapshot envelope")
 	}
 	want := s.SnapshotDigest
@@ -66,6 +67,9 @@ func SaveSnapshot(ctx context.Context, store SnapshotStore, s Snapshot) error {
 	return nil
 }
 func LoadSnapshot(ctx context.Context, store SnapshotStore, key string) (Snapshot, error) {
+	if !validDigest(key) {
+		return Snapshot{}, fail(SnapshotCorrupt, "invalid snapshot digest key")
+	}
 	if store == nil {
 		return Snapshot{}, fail(SnapshotCorrupt, "snapshot store is required")
 	}
@@ -96,4 +100,12 @@ func DecodeSnapshot(data []byte) (Snapshot, error) {
 		return Snapshot{}, err
 	}
 	return s, nil
+}
+
+func validDigest(value string) bool {
+	if len(value) != 64 || value != strings.ToLower(value) {
+		return false
+	}
+	_, err := hex.DecodeString(value)
+	return err == nil
 }

@@ -518,3 +518,28 @@ go vet ./...
 ```
 
 The package script derives the module path through `go list -m` for version injection. It creates the macOS Apple silicon archive under `dist/`.
+
+## Google-authored working drafts
+
+`mdoc working-draft` reads an existing Google Doc without publishing Markdown or creating a review baseline. It emits JSON and never edits the remote document. Use `mdoc auth login` and grant the existing document to the same OAuth app/account through Google Picker first; `drive.file` login alone does not authorize an arbitrary document URL.
+
+```sh
+mdoc working-draft inspect DOCUMENT_ID
+mdoc working-draft capture DOCUMENT_ID > baseline.json
+# After a collaborator edits the Google Doc:
+mdoc working-draft capture DOCUMENT_ID > incoming.json
+mdoc working-draft compare baseline.json incoming.json current.json
+mdoc working-draft discussion DOCUMENT_ID --all
+```
+
+`current.json` contains the caller's current normalized `{"title":"...","body":"..."}`. For an unchanged local baseline, extract `normalized_content` from `baseline.json`. Comparison is offline, returns incoming content and explicit local divergence, and does not apply it. Save redirected snapshots in a private directory; redirection permissions belong to your shell.
+
+Check `body_usable` and `diagnostics` before using a capture. Initial support is one root tab in a native My Drive Doc: paragraphs, headings, ordinary bullet/decimal lists, bold/italic/strikethrough and external links. Suggestions, tables, images, chips, footnotes, internal links and unverified structures block body use. Discussion remains readable. Paginated/failed refreshes never authorize deletion of unseen records; merge IDs and honor explicit deletion flags. `--all` retains partial results on stdout and exits with a structured error if interrupted.
+
+Applications import `github.com/goliatone/mdoc/workingdraft`, call `New(Options{HTTPClient: authenticatedClient})`, and use the same typed operations. Token sources, providers, converters and byte-oriented snapshot stores are injectable. `Compare`, `DecodeSnapshot`, `VerifySnapshot`, `SaveSnapshot` and `LoadSnapshot` are usable without global configuration. `NewAuth` provides noninteractive Start/Finish/Status/TokenSource helpers with an explicit credential store and trusted callback URL. Bind opaque account references to the host actor/project; no library operation creates hidden storage or opens a browser.
+
+The built-in conversion version is `google-docs-prose-v2`. Recapture both baseline and incoming snapshots when moving from v1; comparison rejects mixed conversion versions. Snapshot evidence removes temporary image `contentUri` access URLs before hashing or storage. Older snapshots containing those fields are rejected and must be recaptured.
+
+Custom `Provider.Document` implementations now return the original `json.RawMessage`, preserving absent versus explicitly false style properties. Do not round-trip responses through SDK structs. Converters receive resolved effective text styles, while snapshot evidence preserves original field presence. Named-style inheritance, independent list boundaries and parent marker widths are preserved; ambiguous nesting and code-like mixed indentation block body use.
+
+Custom authentication stores now implement `Load(ctx, accountRef) (CredentialRecord, error)` and `CompareAndSwap(ctx, accountRef, expectedRevision, nextRecord) (bool, error)`. Persist the token, unique revision and connection ID together in private storage. CAS must be atomic across every process using the store; return false without mutation on a revision mismatch. Load returns an empty record for an absent account, and revisions must never be reused. Reconnection changes the connection ID and invalidates previous token sources and pending callbacks. This replaces the earlier unconditional Load/Save API; a process-local mutex around Save is insufficient for shared storage.

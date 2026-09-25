@@ -24,7 +24,9 @@ func (p *provider) File(context.Context, string) (*drive.File, error) {
 	}
 	return &drive.File{Id: "doc", Name: p.doc.Title, MimeType: "application/vnd.google-apps.document", Version: 1}, nil
 }
-func (p *provider) Document(context.Context, string) (*docs.Document, error) { return p.doc, nil }
+func (p *provider) Document(context.Context, string) (json.RawMessage, error) {
+	return json.Marshal(p.doc)
+}
 func (p *provider) Comments(context.Context, string, string) (*drive.CommentList, error) {
 	p.calls++
 	return p.comments, p.err
@@ -110,5 +112,78 @@ func TestUnsupportedAndSuggestedBodyRetainsEvidence(t *testing.T) {
 				t.Fatal(err)
 			}
 		})
+	}
+}
+
+type alternateConverter struct{}
+
+func (alternateConverter) Convert(context.Context, *docs.Document) (wd.Content, []wd.Diagnostic, error) {
+	return wd.Content{Title: "Draft", Body: "alternate\n"}, nil, nil
+}
+func TestConversionVersionCannotMixProposalSemantics(t *testing.T) {
+	p := &provider{doc: document("body")}
+	if _, err := wd.New(wd.Options{Provider: p, Converter: alternateConverter{}}); err == nil {
+		t.Fatal("accepted unversioned converter")
+	}
+	standard, _ := wd.New(wd.Options{Provider: p})
+	alternate, _ := wd.New(wd.Options{Provider: p, Converter: alternateConverter{}, ConversionVersion: "alternate-v1"})
+	ctx := context.Background()
+	base, err := standard.Capture(ctx, wd.SourceRef{DocumentID: "doc"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	incoming, err := alternate.Capture(ctx, wd.SourceRef{DocumentID: "doc"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if incoming.ConversionVersion != "alternate-v1" {
+		t.Fatal("lost converter identity")
+	}
+	if _, err := wd.Compare(ctx, wd.CompareInput{Baseline: base, Incoming: incoming, Current: base.NormalizedContent}); err == nil {
+		t.Fatal("compared different conversion semantics")
+	}
+}
+
+type guardedStore struct {
+	memoryStore
+	reads int
+}
+
+func (s *guardedStore) Get(ctx context.Context, key string) ([]byte, error) {
+	s.reads++
+	return s.memoryStore.Get(ctx, key)
+}
+func TestLoadRejectsUnsafeKeysBeforeStore(t *testing.T) {
+	store := &guardedStore{memoryStore: memoryStore{}}
+	if _, err := wd.LoadSnapshot(context.Background(), store, "../../credentials"); err == nil || store.reads != 0 {
+		t.Fatal("unsafe key reached the store")
+	}
+}
+func TestLiteralEntitiesAndEquivalentFormattingArePreserved(t *testing.T) {
+	d := document("unused")
+	d.Tabs[0].DocumentTab.Body.Content[1].Paragraph.Elements = []*docs.ParagraphElement{
+		{TextRun: &docs.TextRun{Content: "&copy; "}},
+		{TextRun: &docs.TextRun{Content: "bo", TextStyle: &docs.TextStyle{Bold: true, FontSize: &docs.Dimension{Magnitude: 10, Unit: "PT"}}}},
+		{TextRun: &docs.TextRun{Content: "ld", TextStyle: &docs.TextStyle{Bold: true, FontSize: &docs.Dimension{Magnitude: 12, Unit: "PT"}}}},
+		{TextRun: &docs.TextRun{Content: "\n"}},
+	}
+	s, _ := wd.New(wd.Options{Provider: &provider{doc: d}})
+	snapshot, err := s.Capture(context.Background(), wd.SourceRef{DocumentID: "doc"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if snapshot.NormalizedContent.Body != "\\&copy; **bold**\n" {
+		t.Fatalf("changed literal/formatting: %q", snapshot.NormalizedContent.Body)
+	}
+}
+
+func TestLiteralIndentationCannotBecomeCode(t *testing.T) {
+	s, _ := wd.New(wd.Options{Provider: &provider{doc: document("    prose, not code")}})
+	snapshot, err := s.Capture(context.Background(), wd.SourceRef{DocumentID: "doc"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if snapshot.BodyUsable || len(snapshot.Diagnostics) == 0 {
+		t.Fatal("ambiguous indentation became usable Markdown")
 	}
 }

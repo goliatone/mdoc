@@ -12,7 +12,7 @@ import (
 )
 
 const ProviderGoogleDocs = "google_docs"
-const ConversionVersion = "google-docs-prose-v1"
+const ConversionVersion = "google-docs-prose-v2"
 const SchemaVersion = 1
 
 type ErrorCode string
@@ -143,24 +143,26 @@ type SnapshotStore interface {
 }
 type Provider interface {
 	File(context.Context, string) (*drive.File, error)
-	Document(context.Context, string) (*docs.Document, error)
+	Document(context.Context, string) (json.RawMessage, error)
 	Comments(context.Context, string, string) (*drive.CommentList, error)
 }
 type Converter interface {
 	Convert(context.Context, *docs.Document) (Content, []Diagnostic, error)
 }
 type Options struct {
-	HTTPClient  *http.Client
-	TokenSource oauth2.TokenSource
-	Provider    Provider
-	Converter   Converter
-	Store       SnapshotStore
-	Now         func() time.Time
-	Attempts    int
+	ConversionVersion string
+	HTTPClient        *http.Client
+	TokenSource       oauth2.TokenSource
+	Provider          Provider
+	Converter         Converter
+	Store             SnapshotStore
+	Now               func() time.Time
+	Attempts          int
 }
 type API interface {
 	Inspect(context.Context, SourceRef) (Inspection, error)
 	Capture(context.Context, SourceRef) (Snapshot, error)
 	Compare(context.Context, CompareInput) (Proposal, error)
 	ReadDiscussion(context.Context, DiscussionInput) (DiscussionPage, error)
+	ReadAllDiscussion(context.Context, SourceRef) (DiscussionPage, error)
 }

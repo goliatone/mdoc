@@ -15,6 +15,7 @@ import (
 	"github.com/goliatone/mdoc/internal/auth"
 	mdocconfig "github.com/goliatone/mdoc/internal/config"
 	"github.com/goliatone/mdoc/internal/probe"
+	"github.com/goliatone/mdoc/workingdraft"
 )
 
 type AuthService interface {
@@ -30,30 +31,32 @@ type ProbeService interface {
 }
 
 type Runtime struct {
-	Context  context.Context
-	App      app.Service
-	Auth     AuthService
-	Probe    ProbeService
-	Out      io.Writer
-	Explicit map[string]bool
+	WorkingDraft workingdraft.API
+	Context      context.Context
+	App          app.Service
+	Auth         AuthService
+	Probe        ProbeService
+	Out          io.Writer
+	Explicit     map[string]bool
 }
 
 type CLI struct {
-	Version  kong.VersionFlag `name:"version" help:"Print the mdoc version and exit."`
-	Init     InitCmd          `cmd:"" help:"Create a workspace configuration."`
-	Config   ConfigCmd        `cmd:"" help:"Inspect effective configuration."`
-	Profile  ProfileCmd       `cmd:"" help:"Create and inspect project profiles."`
-	Auth     AuthCmd          `cmd:"" help:"Manage Google authorization."`
-	Setup    SetupCmd         `cmd:"" help:"Create or find app owned Google folders."`
-	Validate ValidateCmd      `cmd:"" help:"Validate configuration and source documents."`
-	Publish  PublishCmd       `cmd:"" help:"Plan and publish documents."`
-	Plan     PlanCmd          `cmd:"" help:"Build a read only publish plan."`
-	Status   StatusCmd        `cmd:"" help:"Show local, remote, and review state."`
-	Doctor   DoctorCmd        `cmd:"" help:"Check local and project capabilities without publishing."`
-	State    StateCmd         `cmd:"" help:"Manage local publish state."`
-	Open     OpenCmd          `cmd:"" help:"Open a published Google Doc."`
-	Review   ReviewCmd        `cmd:"" help:"Read review changes without modifying sources or Google Docs."`
-	Probe    ProbeCmd         `cmd:"" hidden:"" help:"Run disposable feasibility probes."`
+	WorkingDraft WorkingDraftCmd  `cmd:"" help:"Read Google-authored working drafts without publishing."`
+	Version      kong.VersionFlag `name:"version" help:"Print the mdoc version and exit."`
+	Init         InitCmd          `cmd:"" help:"Create a workspace configuration."`
+	Config       ConfigCmd        `cmd:"" help:"Inspect effective configuration."`
+	Profile      ProfileCmd       `cmd:"" help:"Create and inspect project profiles."`
+	Auth         AuthCmd          `cmd:"" help:"Manage Google authorization."`
+	Setup        SetupCmd         `cmd:"" help:"Create or find app owned Google folders."`
+	Validate     ValidateCmd      `cmd:"" help:"Validate configuration and source documents."`
+	Publish      PublishCmd       `cmd:"" help:"Plan and publish documents."`
+	Plan         PlanCmd          `cmd:"" help:"Build a read only publish plan."`
+	Status       StatusCmd        `cmd:"" help:"Show local, remote, and review state."`
+	Doctor       DoctorCmd        `cmd:"" help:"Check local and project capabilities without publishing."`
+	State        StateCmd         `cmd:"" help:"Manage local publish state."`
+	Open         OpenCmd          `cmd:"" help:"Open a published Google Doc."`
+	Review       ReviewCmd        `cmd:"" help:"Read review changes without modifying sources or Google Docs."`
+	Probe        ProbeCmd         `cmd:"" hidden:"" help:"Run disposable feasibility probes."`
 }
 
 var Version = "dev"
@@ -595,9 +598,13 @@ func (e *UsageError) Unwrap() error {
 }
 
 func Execute(args []string, stdout, stderr io.Writer, authService AuthService, services ...any) error {
+	var draft workingdraft.API
 	var probeService ProbeService
 	var appService app.Service
 	for _, candidate := range services {
+		if service, ok := candidate.(workingdraft.API); ok {
+			draft = service
+		}
 		if service, ok := candidate.(ProbeService); ok {
 			probeService = service
 		}
@@ -637,7 +644,7 @@ func Execute(args []string, stdout, stderr io.Writer, authService AuthService, s
 	if err != nil {
 		return &UsageError{Err: err}
 	}
-	if err := parsed.Run(&Runtime{Context: context.Background(), App: appService, Auth: authService, Probe: probeService, Out: stdout, Explicit: explicitFlags(args)}); err != nil {
+	if err := parsed.Run(&Runtime{WorkingDraft: draft, Context: context.Background(), App: appService, Auth: authService, Probe: probeService, Out: stdout, Explicit: explicitFlags(args)}); err != nil {
 		if _, ok := errors.AsType[*kong.ParseError](err); ok {
 			return &UsageError{Err: err}
 		}
@@ -685,6 +692,10 @@ func WriteError(writer io.Writer, err error, jsonOutput bool) {
 		result.Code = typed.Code
 		result.Recovery = typed.Recovery
 	}
+	if typed, ok := errors.AsType[*workingdraft.Error](err); ok {
+		result.Class = "working_draft"
+		result.Code = string(typed.Code)
+	}
 	if _, ok := errors.AsType[*UsageError](err); ok {
 		result.Code = "usage_error"
 	}
@@ -692,6 +703,9 @@ func WriteError(writer io.Writer, err error, jsonOutput bool) {
 }
 
 func WantsJSON(args []string) bool {
+	if len(args) > 0 && args[0] == "working-draft" {
+		return true
+	}
 	projectPath := ""
 	var outputValue *bool
 	var jsonValue *bool

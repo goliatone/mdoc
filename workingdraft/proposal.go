@@ -22,6 +22,9 @@ func Compare(ctx context.Context, input CompareInput) (Proposal, error) {
 			return Proposal{}, fail(UnsupportedContent, "unusable snapshot body blocks proposals")
 		}
 	}
+	if input.Baseline.ConversionVersion != input.Incoming.ConversionVersion {
+		return Proposal{}, fail(UnsupportedContent, "baseline and incoming conversion versions differ")
+	}
 	if input.Baseline.Source != input.Incoming.Source {
 		return Proposal{}, fail(InvalidSource, "baseline and incoming source identities differ")
 	}

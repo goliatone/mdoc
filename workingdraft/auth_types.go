@@ -2,14 +2,23 @@ package workingdraft
 
 import (
 	"context"
-	"golang.org/x/oauth2"
 	"net/http"
 	"time"
+
+	"golang.org/x/oauth2"
 )
 
+type CredentialRecord struct {
+	Revision     string        `json:"-"`
+	ConnectionID string        `json:"-"`
+	Token        *oauth2.Token `json:"-"`
+}
+
+// Load returns an empty record for an absent account. Revisions must never be reused.
+// CompareAndSwap atomically replaces only the expected revision across all callers.
 type CredentialStore interface {
-	Load(context.Context, string) (*oauth2.Token, error)
-	Save(context.Context, string, *oauth2.Token) error
+	Load(ctx context.Context, accountRef string) (CredentialRecord, error)
+	CompareAndSwap(ctx context.Context, accountRef, expectedRevision string, next CredentialRecord) (bool, error)
 }
 type AuthOptions struct {
 	ClientID     string
