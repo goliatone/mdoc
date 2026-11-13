@@ -1,0 +1,21 @@
+version: 1
+project: example-project
+index:
+  source: index.md
+  inventory_heading: Bundle inventory
+layout:
+  index: 00-START-HERE.md
+  sections:
+    requirements: docs/requirements
+    architecture: docs/architecture
+    decisions: docs/architecture/decisions
+  assets: "{document_dir}/assets/{document_stem}"
+  asset_index: "navigation/{id}.md"
+naming:
+  case: lower
+  separator: "-"
+  document_pattern: "{id}-{slug}"
+  asset_pattern: "{slug}-{digest8}"
+  preserve: [README.md, 00-START-HERE.md]
+links:
+  unresolved_fragments: preserve

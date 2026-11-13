@@ -3,6 +3,7 @@ package auth
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"io"
 	"net/http"
 	"os"
@@ -14,6 +15,45 @@ import (
 
 	"golang.org/x/oauth2"
 )
+
+func TestContributionLogoutRevokesExistingClient(t *testing.T) {
+	store := NewTokenStore(filepath.Join(t.TempDir(), "auth", "token.json"))
+	if err := store.Save(&oauth2.Token{AccessToken: "access", TokenType: "Bearer", Expiry: time.Now().Add(time.Hour)}); err != nil {
+		t.Fatal(err)
+	}
+	sends := 0
+	service := newTestService(t, ServiceOptions{Store: store, HTTPClient: &http.Client{Transport: contributionTransport(func(*http.Request) (*http.Response, error) {
+		sends++
+		return &http.Response{StatusCode: 200, Header: make(http.Header), Body: io.NopCloser(strings.NewReader("{}"))}, nil
+	})}})
+	client, binding, err := service.ContributionClient(context.Background())
+	if err != nil || binding == "" {
+		t.Fatal("cannot bind initial client", err)
+	}
+	before, err := store.Load()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err = service.Logout(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if response, err := client.Get("https://example.test/"); err == nil {
+		response.Body.Close()
+		t.Fatal("logged-out client sent a request")
+	}
+	if sends != 0 {
+		t.Fatal("provider received a request after logout")
+	}
+	if _, err = NewTokenStore(store.Path()).Load(); !errors.Is(err, ErrTokenNotFound) {
+		t.Fatalf("fresh store retained logged-out credentials: %v", err)
+	}
+	if err = store.saveRefresh(before, before); !errors.Is(err, ErrTokenNotFound) {
+		t.Fatalf("stale refresh resurrected logout: %v", err)
+	}
+	if _, _, err = service.ContributionClient(context.Background()); !errors.Is(err, ErrTokenNotFound) {
+		t.Fatalf("new contribution client admitted after logout: %v", err)
+	}
+}
 
 type contributionTransport func(*http.Request) (*http.Response, error)
 

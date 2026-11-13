@@ -593,10 +593,85 @@ Only a span strictly inside one original unlinked text run is eligible: in `abcd
 
 Create supports headings, paragraphs, lists, emphasis and explicit HTTP(S) links. It requires Pandoc and an existing writable My Drive folder. Images, tables, raw HTML, local links, filters and external resources are rejected. Limits are 1 MiB Markdown, 10 MiB DOCX, 1 KiB title, 64 KiB replacement/reply, 10 MiB per response and 100 discovery pages. Shared Drives and multiple tabs remain unsupported.
 
-Execution emits an outcome on stdout even when it returns an error: `committed`, `not_sent`, `conflict`, or `unknown`. A repeated committed command returns its receipt without another provider call. Every claimed operation is single-send, including `not_sent`/`conflict`; correct the input and prepare a new operation when safe. Lost responses, process crashes in `sending`, and missing acknowledgment IDs require `inspect` or manual reconciliation. Inspection never resends, proves absence after a timeout, or attributes a matching reply solely by its text. Historical committed receipts survive later edits, deletion or lost access. Do not delete or reset a journal to escape uncertainty. Exit code 8 indicates reconciliation is required, including when a receipt cannot be saved after a write or inspection. Preserve stdout and the journal, repair storage, then inspect without resending; an acknowledged write remains `committed` in stdout even if its receipt save fails. Structured error codes distinguish other failures.
+Execution emits an outcome on stdout even when it returns an error: `committed`, `not_sent`, `conflict`, or `unknown`. A repeated committed command returns its receipt without another provider call. Every claimed operation is single-send, including `not_sent`/`conflict`; correct the input and prepare a new operation when safe. Lost responses, process crashes in `sending`, and missing acknowledgment IDs require `inspect` or manual reconciliation. Inspection never resends, proves absence after a timeout, or attributes a matching reply solely by its text. Historical committed receipts survive later edits, deletion or lost access. Do not delete or reset a journal to escape uncertainty. Exit code 8 indicates reconciliation is required, including when a receipt cannot be saved after a write or inspection. Preserve stdout and the journal, repair storage, then inspect without resending; an acknowledged write remains `committed` in stdout even if its receipt save fails. If result output fails (including a closed pipe), unknown or acknowledged effects also return exit 8; inspect the retained plan with the same journal after restoring output. Provider and receipt-save errors remain available alongside the output error. Structured error codes distinguish other failures.
 
 Create inspection reads a retained document ID directly. Its optional `creation` evidence reports trash status and whether metadata, destination and topology still match; missing access is reported as inaccessible. Historical commitment is preserved even when metadata discovery would miss the document. For uncertain operations, direct identity observation alone is not proof of commitment: recovery still requires complete, unique exact metadata discovery.
 
-Applications import `github.com/goliatone/mdoc/contribution` and construct `New(Options{AccountBinding: connectionID, TokenSource: tokenSource})`, or supply an explicitly authenticated `HTTPClient`. Supply exactly one auth configuration; injected transports must not retry writes. The typed `PrepareCreate/Create`, `PrepareUpdate/ApplyUpdate`, `PrepareReply/Reply` and `InspectOutcome` APIs contain no ctx policies or SDK request DTOs. Use `DecodeCreatePlan`, `DecodeUpdatePlan` and `DecodeReplyPlan` for retained JSON. The service has no durable store: the host must authorize exact content, atomically bind operation/digest, serialize claims, persist `sending` before dispatch, and retain the outcome even when an error is returned. Set `Attempt.FirstTransmission` only for that fresh durable claim. A digest and attempt ID are not authorization. Reconnection requires a newly prepared plan; the CLI's persisted login generation survives refresh but changes on login/logout. Legacy credential files migrate under the credential lock to a random persisted generation on first use. Plans prepared against an older derived legacy binding require new preparation; preserve any previously claimed operation for recovery rather than resending it.
+Applications import `github.com/goliatone/mdoc/contribution` and construct `New(Options{AccountBinding: connectionID, TokenSource: tokenSource})`, or supply an explicitly authenticated `HTTPClient`. Supply exactly one auth configuration; injected transports must not retry writes. The typed `PrepareCreate/Create`, `PrepareUpdate/ApplyUpdate`, `PrepareReply/Reply` and `InspectOutcome` APIs contain no ctx policies or SDK request DTOs. Use `DecodeCreatePlan`, `DecodeUpdatePlan` and `DecodeReplyPlan` for retained JSON. The service has no durable store: the host must authorize exact content, atomically bind operation/digest, serialize claims, persist `sending` before dispatch, and retain the outcome even when an error is returned. Set `Attempt.FirstTransmission` only for that fresh durable claim. A digest and attempt ID are not authorization. Reconnection requires a newly prepared plan; the CLI's persisted login generation survives refresh but changes on login/logout. Legacy credential files migrate under the credential lock to a random persisted generation on first use. Logout syncs token removal before reporting success; if persistence fails, repair storage and retry logout even if the token file is already absent. Plans prepared against an older derived legacy binding require new preparation; preserve any previously claimed operation for recovery rather than resending it.
 
 Local SDK/CLI smoke covers create/replay, stale/fresh updates, replies, inspection, cross-process locks and crash/lost-response recovery. A maintainer-authorized disposable Google folder/document is still required to verify visible conversion and surrounding formatting before production adoption. No live write, acceptance, tag, release or ctx consumer adoption is implied by these checks.
+
+## Portable document bundles
+
+`mdoc bundle` exports an explicitly inventoried Drive collection to ordinary
+Markdown and local image files. It reads Google content without changing it.
+The existing `publish --bundle` command still publishes a local collection into
+one Google Doc; its configuration and behavior are unchanged.
+
+```sh
+mdoc bundle init --directory ./bundle-project --project my-project
+# Fill bundle-project/index.md with canonical Google links, or configure a native Docs index.
+mdoc bundle plan --config ./bundle-project/mdoc-bundle.yaml --json
+mdoc bundle export --config ./bundle-project/mdoc-bundle.yaml --output ./snapshot
+mdoc bundle verify ./snapshot --json
+```
+
+Plan/export use the existing explicitly selected account from `mdoc auth login`.
+Every required file must be accessible to that app/account; index or folder access
+is not an access grant to all descendants. Init and verify never select credentials.
+Pandoc must be installed for conversion and verification. Readers need only a
+Markdown viewer. Move the entire output directory to preserve navigation/images.
+The destination parent must exist; export never overwrites an existing path.
+Exclusive directory installation currently supports macOS and Linux.
+
+The single authored inventory is a table under `Bundle inventory` with exactly
+`ID`, `Document`, `Section`, `Path`, and `Role` columns. Each Document cell contains
+one ordinary canonical Google hyperlink. IDs and source file identities must be
+unique. Roles are `document`, `asset`, `asset-tree`, and `reference`. Documents
+use configured section directories and filename templates, or an exact Path.
+Assets/trees require a Path; references have no local destination. Prose links do
+not add membership. A native Docs table and a stored/local Markdown index use the
+same convention. [The starter example](testdata/examples/portable-bundle/mdoc-bundle.yaml)
+shows nesting, optional ID prefixes, and preserved entry-point names.
+
+Default names are lowercase kebab-case; exact paths retain spelling. File identity
+is independent of its name. Configure `layout.index`, `layout.sections`,
+`layout.assets`, `layout.asset_index`, and `naming` in the separate version-1
+`mdoc-bundle.yaml`. Unknown fields/tokens, traversal, file/directory conflicts and
+Unicode/case-insensitive collisions fail explicitly. Generated asset-tree listings
+live outside copied trees, preserving source `README.md` and `manifest.json` files.
+
+Native Docs support one root tab, text/headings, lists, emphasis, ordinary links,
+plain pasted images and simple rectangular tables. Stored Markdown uses GFM.
+Embed images in native Docs; authors need not upload a separate copy. Markdown
+images may use Drive image links or original relative paths within declared asset
+trees. Relative paths resolve before destination layout changes. Native online
+reading should use embedded images and canonical Google links; Drive preview is
+not presumed to resolve arbitrary Markdown-relative resources.
+
+PNG, JPEG, GIF and a conservative self-contained static SVG subset are validated
+and copied. Missing figures, drawings/charts, cropped/transformed native images,
+raw embeds, suggestions, complex tables, multiple tabs, Shared Drives and arbitrary
+remote image hosts prevent installation. There is no diagram regeneration or
+permission/scope escalation. Local index images use canonical Drive links.
+
+`local_complete` means required files/images and local navigation passed checks.
+`no_online_dependencies` separately reports whether any navigation remains online.
+External/archive references and unverifiable canonical fragments stay online with
+diagnostics; `links.unresolved_fragments: error` makes unverifiable fragments fail.
+Verification checks actual files, hashes, links/anchors, image decoding and path
+containment without network access. It does not prove source authenticity or approval.
+
+The manifest records source versions/revisions, capture intervals, content/asset
+hashes and occurrence provenance, with no temporary image capabilities. A changing
+source or expired native image URL restarts the whole capture, at most three times.
+Captures are stable per source, not an atomic snapshot of the entire collection.
+Default limits are 100 documents, 1,000 asset sources/image occurrences, tree depth
+8, 10 MiB/source, 20 MiB/image and 500 MiB cumulative/installed bytes. Explicit
+ceilings are 1,000 documents, 10,000 assets/occurrences, depth 32, 50 MiB/source,
+100 MiB/image, 2 GiB total and three attempts. Failed/canceled attempts do not install
+output; transfer budgets include retries.
+
+Focused local adapter/CLI checks establish trial readiness. A maintainer-owned
+read-only live trial still needs to confirm access, visible image fidelity and
+online navigation for the intended collection before acceptance or release.

@@ -154,13 +154,27 @@ func (s *TokenStore) write(token *oauth2.Token, connection string) error {
 	return nil
 }
 
-func (s *TokenStore) remove() error {
-	err := os.Remove(s.path)
-	if errors.Is(err, os.ErrNotExist) {
-		return nil
-	}
+// remove holds the credential lock through directory sync so logout cannot
+// acknowledge a revocation that exists only in the filesystem cache.
+func (s *TokenStore) remove(syncDirectory func(*os.File) error) error {
+	release, err := s.lock()
 	if err != nil {
+		return err
+	}
+	defer release()
+	directory, err := os.Open(filepath.Dir(s.path))
+	if err != nil {
+		return fmt.Errorf("open OAuth token directory for logout: %w", err)
+	}
+	defer directory.Close()
+	err = os.Remove(s.path)
+	if err != nil && !errors.Is(err, os.ErrNotExist) {
 		return fmt.Errorf("remove OAuth token: %w", err)
+	}
+	// A previous unlink may have succeeded while its sync failed. Even an
+	// already absent token must cross this durability boundary on retry.
+	if err := syncDirectory(directory); err != nil {
+		return fmt.Errorf("sync OAuth logout: %w", err)
 	}
 	return nil
 }
@@ -210,10 +224,5 @@ func (s *TokenStore) saveRefresh(before, after *oauth2.Token) error {
 	return s.write(after, connectionID(current))
 }
 func (s *TokenStore) Remove() error {
-	release, e := s.lock()
-	if e != nil {
-		return e
-	}
-	defer release()
-	return s.remove()
+	return s.remove((*os.File).Sync)
 }

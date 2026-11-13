@@ -1,6 +1,8 @@
 package cli
 
 import (
+	"errors"
+	"fmt"
 	"io"
 	"os"
 
@@ -74,10 +76,7 @@ func (c ContributionExecution) run(r *Runtime, k contribution.Kind) error {
 		return e
 	}
 	o, e := contributions(r).Execute(r.Context, k, b, c.ExpectDigest, c.Journal, c.Write)
-	if outErr := writeJSON(r.Out, o); outErr != nil {
-		return outErr
-	}
-	return e
+	return writeContributionResult(r.Out, o, o, e)
 }
 func (c ContributionPrepareCreateCmd) Run(r *Runtime) error { return c.run(r, contribution.CreateKind) }
 func (c ContributionPrepareUpdateCmd) Run(r *Runtime) error { return c.run(r, contribution.UpdateKind) }
@@ -91,8 +90,23 @@ func (c ContributionInspectCmd) Run(r *Runtime) error {
 		return e
 	}
 	result, e := contributions(r).Inspect(r.Context, b, c.Journal)
-	if outErr := writeJSON(r.Out, result); outErr != nil {
-		return outErr
+	return writeContributionResult(r.Out, result, result.Outcome, e)
+}
+
+// Output delivery cannot change the provider outcome or erase a recovery error.
+// Inspection may return an unknown historical outcome without an error, and an
+// acknowledged write may have succeeded even when its result cannot be delivered.
+func writeContributionResult(out io.Writer, result any, outcome contribution.Outcome, operationErr error) error {
+	if outErr := writeJSON(out, result); outErr != nil {
+		var recoveryErr error
+		if outcome.Status == contribution.Unknown || outcome.Status == contribution.Committed {
+			recoveryErr = &contribution.Error{
+				Status:  outcome.Status,
+				Code:    contribution.ReconciliationRequired,
+				Message: "contribution result could not be delivered; inspect the retained plan with the same journal without resending",
+			}
+		}
+		return errors.Join(recoveryErr, operationErr, fmt.Errorf("write contribution result: %w", outErr))
 	}
-	return e
+	return operationErr
 }

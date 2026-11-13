@@ -16,6 +16,7 @@ import (
 	"github.com/goliatone/mdoc/internal/auth"
 	mdocconfig "github.com/goliatone/mdoc/internal/config"
 	"github.com/goliatone/mdoc/internal/probe"
+	"github.com/goliatone/mdoc/portable"
 	"github.com/goliatone/mdoc/workingdraft"
 )
 
@@ -32,6 +33,7 @@ type ProbeService interface {
 }
 
 type Runtime struct {
+	Portable      portable.API
 	Contributions *app.Contributions
 	WorkingDraft  workingdraft.API
 	Context       context.Context
@@ -43,6 +45,7 @@ type Runtime struct {
 }
 
 type CLI struct {
+	Bundle       BundleCmd        `cmd:"" help:"Export portable read-only document collections and verify them offline."`
 	Contribution ContributionCmd  `cmd:"" help:"Prepare, perform and inspect explicit Google document contributions."`
 	WorkingDraft WorkingDraftCmd  `cmd:"" help:"Read Google-authored working drafts without publishing."`
 	Version      kong.VersionFlag `name:"version" help:"Print the mdoc version and exit."`
@@ -601,11 +604,15 @@ func (e *UsageError) Unwrap() error {
 }
 
 func Execute(args []string, stdout, stderr io.Writer, authService AuthService, services ...any) error {
+	var portableService portable.API
 	var contributions *app.Contributions
 	var draft workingdraft.API
 	var probeService ProbeService
 	var appService app.Service
 	for _, candidate := range services {
+		if service, ok := candidate.(portable.API); ok {
+			portableService = service
+		}
 		if service, ok := candidate.(*app.Contributions); ok {
 			contributions = service
 		}
@@ -619,7 +626,8 @@ func Execute(args []string, stdout, stderr io.Writer, authService AuthService, s
 			appService = service
 		}
 	}
-	if authService == nil {
+	offlineBundle := len(args) >= 2 && args[0] == "bundle" && (args[1] == "verify" || args[1] == "init")
+	if authService == nil && !offlineBundle {
 		service, err := auth.NewService(auth.ServiceOptions{PromptWriter: stderr})
 		if err != nil {
 			return err
@@ -651,7 +659,7 @@ func Execute(args []string, stdout, stderr io.Writer, authService AuthService, s
 	if err != nil {
 		return &UsageError{Err: err}
 	}
-	if err := parsed.Run(&Runtime{Contributions: contributions, WorkingDraft: draft, Context: context.Background(), App: appService, Auth: authService, Probe: probeService, Out: stdout, Explicit: explicitFlags(args)}); err != nil {
+	if err := parsed.Run(&Runtime{Portable: portableService, Contributions: contributions, WorkingDraft: draft, Context: context.Background(), App: appService, Auth: authService, Probe: probeService, Out: stdout, Explicit: explicitFlags(args)}); err != nil {
 		if _, ok := errors.AsType[*kong.ParseError](err); ok {
 			return &UsageError{Err: err}
 		}
@@ -674,6 +682,18 @@ func yesNo(value bool) string {
 }
 
 func ExitCode(err error) int {
+	if e, ok := errors.AsType[*portable.Error](err); ok {
+		switch e.Code {
+		case "account_unavailable", "access_denied":
+			return 4
+		case "unsupported_content", "unsupported_image":
+			return 6
+		case "transport_failure", "unstable_source", "image_unavailable":
+			return 7
+		default:
+			return 2
+		}
+	}
 	if e, ok := errors.AsType[*contribution.Error](err); ok {
 		if e.Status == contribution.Unknown || e.Code == contribution.ReconciliationRequired {
 			return 8
@@ -719,6 +739,10 @@ func WriteError(writer io.Writer, err error, jsonOutput bool) {
 		result.Code = typed.Code
 		result.Recovery = typed.Recovery
 	}
+	if typed, ok := errors.AsType[*portable.Error](err); ok {
+		result.Class = "portable"
+		result.Code = typed.Code
+	}
 	if typed, ok := errors.AsType[*workingdraft.Error](err); ok {
 		result.Class = "working_draft"
 		result.Code = string(typed.Code)
@@ -734,6 +758,23 @@ func WriteError(writer io.Writer, err error, jsonOutput bool) {
 }
 
 func WantsJSON(args []string) bool {
+	if len(args) > 0 && args[0] == "bundle" {
+		value := false
+		for _, arg := range args[1:] {
+			if arg == "--" {
+				break
+			}
+			if arg == "--json" {
+				value = true
+			}
+			if strings.HasPrefix(arg, "--json=") {
+				if parsed, e := strconv.ParseBool(strings.TrimPrefix(arg, "--json=")); e == nil {
+					value = parsed
+				}
+			}
+		}
+		return value
+	}
 	if len(args) > 0 && (args[0] == "working-draft" || args[0] == "contribution") {
 		return true
 	}

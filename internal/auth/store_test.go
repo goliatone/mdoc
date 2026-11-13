@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"golang.org/x/oauth2"
+	"golang.org/x/sys/unix"
 )
 
 func TestTokenStoreSavesAtomicallyWithPrivatePermissions(t *testing.T) {
@@ -97,5 +98,54 @@ func TestTokenStoreRemoveIsIdempotent(t *testing.T) {
 	_, err := store.Load()
 	if !errors.Is(err, ErrTokenNotFound) {
 		t.Fatalf("load after remove = %v", err)
+	}
+}
+
+func TestTokenStoreLogoutSyncFailureAndRetry(t *testing.T) {
+	store := NewTokenStore(filepath.Join(t.TempDir(), "auth", "token.json"))
+	if err := store.Save(&oauth2.Token{AccessToken: "access"}); err != nil {
+		t.Fatal(err)
+	}
+	wantErr := errors.New("directory sync failed")
+	calls := 0
+	syncDirectory := func(dir *os.File) error {
+		calls++
+		if dir.Name() != filepath.Dir(store.Path()) {
+			t.Fatal("syncing the wrong directory")
+		}
+		if _, err := os.Stat(store.Path()); !errors.Is(err, os.ErrNotExist) {
+			t.Fatalf("token must be unlinked before sync: %v", err)
+		}
+		// Login and refresh must remain excluded until revocation is durable.
+		lock, err := os.OpenFile(store.Path()+".lock", os.O_RDWR, 0)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer lock.Close()
+		err = unix.Flock(int(lock.Fd()), unix.LOCK_EX|unix.LOCK_NB)
+		if err == nil {
+			unix.Flock(int(lock.Fd()), unix.LOCK_UN)
+			t.Fatal("credential lock released before revocation sync")
+		}
+		if !errors.Is(err, unix.EWOULDBLOCK) {
+			t.Fatalf("unexpected lock error: %v", err)
+		}
+		if calls == 1 {
+			return wantErr
+		}
+		return dir.Sync()
+	}
+	if err := store.remove(syncDirectory); !errors.Is(err, wantErr) {
+		t.Fatalf("logout acknowledged a failed sync: %v", err)
+	}
+	if err := store.remove(syncDirectory); err != nil {
+		t.Fatal(err)
+	}
+	if calls != 2 {
+		t.Fatalf("retry skipped sync for absent token: calls=%d", calls)
+	}
+	// The public path remains idempotent after the successful retry.
+	if err := store.Remove(); err != nil {
+		t.Fatal(err)
 	}
 }

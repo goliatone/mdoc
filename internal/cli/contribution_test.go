@@ -408,3 +408,177 @@ func TestContributionReceiptPersistenceRecovery(t *testing.T) {
 		})
 	}
 }
+
+// Accept a prefix, then fail, as with a full output file or a closed consumer.
+type contributionFailedOutput struct{}
+
+func (contributionFailedOutput) Write(p []byte) (int, error) {
+	return min(16, len(p)), io.ErrClosedPipe
+}
+
+func TestContributionOutputFailureRecovery(t *testing.T) {
+	for _, tc := range []struct {
+		name         string
+		lost, noSave bool
+	}{
+		{"unknown", true, false},
+		{"committed", false, false},
+		{"unknown-receipt-failure", true, true},
+		{"committed-receipt-failure", false, true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			dir := t.TempDir()
+			journal := filepath.Join(dir, "journal")
+			unavailable := false
+			disrupt := func() {
+				t.Helper()
+				if !tc.noSave || unavailable {
+					return
+				}
+				if err := os.Rename(journal, journal+".retained"); err != nil {
+					t.Fatal(err)
+				}
+				if err := os.WriteFile(journal, nil, 0600); err != nil {
+					t.Fatal(err)
+				}
+				unavailable = true
+			}
+			restore := func() {
+				t.Helper()
+				if unavailable {
+					if err := os.Remove(journal); err != nil {
+						t.Fatal(err)
+					}
+					if err := os.Rename(journal+".retained", journal); err != nil {
+						t.Fatal(err)
+					}
+					unavailable = false
+				}
+			}
+			defer restore()
+			sends := 0
+			inspecting := false
+			api, err := contribution.New(contribution.Options{AccountBinding: "account", HTTPClient: &http.Client{Transport: contributionRoundTrip(func(r *http.Request) (*http.Response, error) {
+				b := `{}`
+				switch {
+				case r.Method == "POST":
+					sends++
+					disrupt()
+					if tc.lost {
+						return nil, errors.New("response lost")
+					}
+					b = `{"id":"reply"}`
+				case strings.Contains(r.URL.Host, "docs."):
+					b = `{"documentId":"doc","tabs":[{"tabProperties":{"tabId":"t.0"}}]}`
+				case strings.HasSuffix(r.URL.Path, "/replies"):
+					b = `{"replies":[]}`
+				case strings.HasSuffix(r.URL.Path, "/replies/reply"):
+					b = `{"id":"reply","content":"reply"}`
+				case strings.Contains(r.URL.Path, "/comments/"):
+					b = `{"id":"comment"}`
+				default:
+					b = `{"id":"doc","mimeType":"application/vnd.google-apps.document","capabilities":{"canComment":true}}`
+				}
+				if inspecting {
+					disrupt()
+				}
+				return &http.Response{StatusCode: 200, Header: make(http.Header), Body: io.NopCloser(strings.NewReader(b))}, nil
+			})}})
+			if err != nil {
+				t.Fatal(err)
+			}
+			service := &app.Contributions{API: api, Binding: "account"}
+			run := func(out io.Writer, args ...string) error {
+				return Execute(append([]string{"contribution"}, args...), out, io.Discard, &fakeAuth{}, service)
+			}
+			input := filepath.Join(dir, "input.json")
+			if err = os.WriteFile(input, []byte(`{"meta":{"namespace":"output-regression"},"source":{"document_id":"doc"},"comment_id":"comment","content":"reply"}`), 0600); err != nil {
+				t.Fatal(err)
+			}
+			var raw bytes.Buffer
+			if err = run(&raw, "prepare-reply", "--input", input, "--journal", journal); err != nil {
+				t.Fatal(err)
+			}
+			plan, err := contribution.DecodeReplyPlan(raw.Bytes())
+			if err != nil {
+				t.Fatal(err)
+			}
+			path := filepath.Join(dir, "plan.json")
+			if err = os.WriteFile(path, raw.Bytes(), 0600); err != nil {
+				t.Fatal(err)
+			}
+			args := []string{"reply", "--plan", path, "--expect-digest", plan.Digest, "--journal", journal, "--write"}
+			check := func(err error, status contribution.Status) {
+				t.Helper()
+				var typed *contribution.Error
+				if !errors.Is(err, io.ErrClosedPipe) || !errors.As(err, &typed) || typed.Code != contribution.ReconciliationRequired || typed.Status != status || ExitCode(err) != 8 {
+					t.Fatalf("lost outcome or output error: %v (exit %d)", err, ExitCode(err))
+				}
+				var encoded bytes.Buffer
+				WriteError(&encoded, err, true)
+				var output ErrorOutput
+				if json.Unmarshal(encoded.Bytes(), &output) != nil || output.Class != "contribution" || output.ExitCode != 8 || output.Code != string(contribution.ReconciliationRequired) || !strings.Contains(output.Message, "without resending") {
+					t.Fatalf("missing recovery guidance: %s", &encoded)
+				}
+			}
+			want := contribution.Committed
+			if tc.lost {
+				want = contribution.Unknown
+			}
+			err = run(contributionFailedOutput{}, args...)
+			check(err, want)
+			if tc.noSave && !strings.Contains(err.Error(), "receipt could not be durably saved") {
+				t.Fatal("receipt error discarded", err)
+			}
+			if tc.lost && !strings.Contains(err.Error(), "Google request failed") {
+				t.Fatal("provider error discarded", err)
+			}
+			restore()
+			store, err := contributionstate.Open(journal)
+			if err != nil {
+				t.Fatal(err)
+			}
+			record, err := store.Load(plan.Input.Meta.Namespace, plan.Input.Meta.OperationID)
+			store.Close()
+			if err != nil || record == nil {
+				t.Fatal("missing claim", err)
+			}
+			if tc.noSave {
+				want = contribution.Unknown
+				if record.State != "sending" {
+					t.Fatal("sending claim lost", record.State)
+				}
+			}
+			if record.Outcome.Status != want {
+				t.Fatal("output failure changed receipt", record.Outcome.Status)
+			}
+			service = &app.Contributions{API: api, Binding: "account"}
+			// Replay must preserve the same receipt and never send again.
+			check(run(contributionFailedOutput{}, args...), want)
+			inspecting = true
+			check(run(contributionFailedOutput{}, "inspect", "--plan", path, "--journal", journal), want)
+			restore()
+			inspecting = false
+			if err = run(io.Discard, "inspect", "--plan", path, "--journal", journal); err != nil {
+				t.Fatal("recovery after restoring output/storage", err)
+			}
+			if sends != 1 {
+				t.Fatal("recovery resent", sends)
+			}
+		})
+	}
+}
+
+func TestContributionOutputPreservesPreflightErrors(t *testing.T) {
+	for _, code := range []contribution.Code{contribution.AccessDenied, contribution.Stale, contribution.ReconciliationRequired} {
+		original := &contribution.Error{Code: code, Status: contribution.NotSent, Message: "preflight or persistence failure"}
+		outcome := contribution.Outcome{Status: contribution.NotSent}
+		err := writeContributionResult(contributionFailedOutput{}, outcome, outcome, original)
+		if !errors.Is(err, original) || !errors.Is(err, io.ErrClosedPipe) || ExitCode(err) != ExitCode(original) {
+			t.Fatalf("classification changed: %v", err)
+		}
+		if err = writeContributionResult(io.Discard, outcome, outcome, original); err != original {
+			t.Fatal("successful output changed error", err)
+		}
+	}
+}
