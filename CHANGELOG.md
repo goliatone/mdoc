@@ -1,6 +1,23 @@
 # Changelog
 
+# [0.3.0](https://github.com/goliatone/mdoc/compare/v0.2.0...v0.3.0) - (2026-11-13)
+
+## <!-- 1 -->🐛 Bug Fixes
+
+- Contribution and genrated docs ([eb30e6c](https://github.com/goliatone/mdoc/commit/eb30e6c2a2ee4ce61d74cf19a051d408228ed60a))  - (goliatone)
+
+## <!-- 16 -->➕ Add
+
+- Portable bundles ([d620c45](https://github.com/goliatone/mdoc/commit/d620c45dde0157ab0a4042c325ffde6fcd35b6bb))  - (goliatone)
+
 # [0.2.0](https://github.com/goliatone/mdoc/compare/v0.1.0...v0.2.0) - (2026-11-13)
+
+
+New minor release: v0.2.0
+
+## <!-- 13 -->📦 Bumps
+
+- Bump version: v0.2.0 ([8de2654](https://github.com/goliatone/mdoc/commit/8de26540324758bcf83cd5c11045fdf591a004b4))  - (goliatone)
 
 ## <!-- 16 -->➕ Add
 
