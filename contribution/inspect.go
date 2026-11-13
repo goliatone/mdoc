@@ -79,13 +79,46 @@ func (s *Service) InspectOutcome(ctx context.Context, in InspectInput) (Inspecti
 		return result, e
 	}
 	if p := in.Create; p != nil {
+		if o.DocumentID != "" {
+			if !identifier.MatchString(o.DocumentID) {
+				return result, fail(InvalidPlan, "invalid retained document identity")
+			}
+			known, e := s.file(ctx, o.DocumentID)
+			if e != nil {
+				return observeError(e)
+			}
+			observation := &CreationObservation{
+				DocumentID: known.Id, Trashed: known.Trashed, MetadataMatches: true,
+				DestinationMatches: len(known.Parents) == 1 && known.Parents[0] == p.Input.ParentID,
+				TopologyMatches:    known.MimeType == nativeDoc && known.DriveId == "",
+			}
+			for k, v := range properties(*p) {
+				if known.AppProperties[k] != v {
+					observation.MetadataMatches = false
+				}
+			}
+			result.Creation = observation
+			result.Evidence = Observed
+			if known.Trashed {
+				result.Diagnostics = append(result.Diagnostics, "retained document is now trashed")
+			}
+			if !observation.MetadataMatches || !observation.DestinationMatches || !observation.TopologyMatches {
+				result.Diagnostics = append(result.Diagnostics, "retained document metadata, destination or topology has drifted")
+			}
+			if o.Status == Committed {
+				return result, nil
+			}
+			result.Diagnostics = append(result.Diagnostics, "retained identity observation alone does not establish this operation's commitment")
+		}
 		f, e := s.findCreate(ctx, *p)
 		if e != nil {
 			return observeError(e)
 		}
 		if f == nil {
-			result.Evidence = AbsentAtRead
-			result.Diagnostics = []string{"absence at read does not establish that an earlier creation was not sent"}
+			if result.Creation == nil {
+				result.Evidence = AbsentAtRead
+			}
+			result.Diagnostics = append(result.Diagnostics, "absence from discovery does not establish that an earlier creation was not sent")
 			return result, nil
 		}
 		if o.DocumentID != "" && o.DocumentID != f.Id {

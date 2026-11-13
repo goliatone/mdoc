@@ -3,6 +3,8 @@ package cli
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
+	"io"
 	"mime"
 	"mime/multipart"
 	"net/http"
@@ -157,6 +159,14 @@ func TestContributionRegisteredCLIRecoverySmoke(t *testing.T) {
 	if e != nil || createWrites != 1 {
 		t.Fatal("create replay sent")
 	}
+	// The retained identity remains inspectable after operation metadata is
+	// removed; the file GET fixture deliberately has no contribution properties.
+	created = nil
+	inspected, e := run("inspect", "--plan", path, "--journal", journal)
+	var creationInspection contribution.Inspection
+	if json.Unmarshal(inspected, &creationInspection) != nil || e != nil || creationInspection.Outcome.Status != contribution.Committed || creationInspection.Evidence != contribution.Observed || creationInspection.Creation == nil || creationInspection.Creation.MetadataMatches || createWrites != 1 {
+		t.Fatalf("retained create inspection lost identity/history: %s %v", inspected, e)
+	}
 	update := contribution.UpdateInput{Meta: meta(), Source: workingdraft.SourceRef{DocumentID: "doc"}, ExpectedRevision: rev, Selection: contribution.TextSelection{ParagraphStart: 1, Start: 1, End: 3, ExpectedText: "bc", ParagraphDigest: contribution.ParagraphDigest(body)}, Replacement: "X"}
 	path, dg, _ = prepare("prepare-update", update)
 	rev = "r2"
@@ -237,4 +247,164 @@ func TestContributionRegisteredCLIRecoverySmoke(t *testing.T) {
 		t.Fatal("inconsistent retained receipt accepted")
 	}
 	t.Logf("real SDK/registered CLI smoke: create=%d update=%d replies=%d (one lost response), restart and sending recovery suppressed resend", createWrites, updateWrites, replyWrites)
+}
+
+func TestContributionReceiptPersistenceRecovery(t *testing.T) {
+	for _, lost := range []bool{true, false} {
+		name := "acknowledged"
+		if lost {
+			name = "response-lost"
+		}
+		t.Run(name, func(t *testing.T) {
+			dir := t.TempDir()
+			journal := filepath.Join(dir, "journal")
+			// Make the path unavailable after provider dispatch while preserving the
+			// opened journal and its durable sending claim for subsequent recovery.
+			unavailable := false
+			disrupt := func() {
+				t.Helper()
+				if unavailable {
+					return
+				}
+				if err := os.Rename(journal, journal+".retained"); err != nil {
+					t.Fatal(err)
+				}
+				if err := os.WriteFile(journal, []byte("unavailable"), 0600); err != nil {
+					t.Fatal(err)
+				}
+				unavailable = true
+			}
+			restore := func() {
+				t.Helper()
+				if !unavailable {
+					return
+				}
+				if err := os.Remove(journal); err != nil {
+					t.Fatal(err)
+				}
+				if err := os.Rename(journal+".retained", journal); err != nil {
+					t.Fatal(err)
+				}
+				unavailable = false
+			}
+			defer restore()
+			sends := 0
+			inspecting := false
+			client := &http.Client{Transport: contributionRoundTrip(func(r *http.Request) (*http.Response, error) {
+				b := `{}`
+				switch {
+				case r.Method == "POST":
+					sends++
+					disrupt()
+					if lost {
+						return nil, errors.New("response lost")
+					}
+					b = `{"id":"reply"}`
+				case strings.Contains(r.URL.Host, "docs."):
+					b = `{"documentId":"doc","tabs":[{"tabProperties":{"tabId":"t.0"}}]}`
+				case strings.HasSuffix(r.URL.Path, "/replies"):
+					b = `{"replies":[]}`
+				case strings.Contains(r.URL.Path, "/comments/"):
+					b = `{"id":"comment"}`
+				default:
+					b = `{"id":"doc","mimeType":"application/vnd.google-apps.document","capabilities":{"canComment":true}}`
+				}
+				if inspecting {
+					disrupt()
+				}
+				return &http.Response{StatusCode: 200, Header: make(http.Header), Body: io.NopCloser(strings.NewReader(b))}, nil
+			})}
+			api, err := contribution.New(contribution.Options{AccountBinding: "account", HTTPClient: client})
+			if err != nil {
+				t.Fatal(err)
+			}
+			service := &app.Contributions{API: api, Binding: "account"}
+			run := func(args ...string) ([]byte, error) {
+				t.Helper()
+				var out, errs bytes.Buffer
+				err := Execute(append([]string{"contribution"}, args...), &out, &errs, &fakeAuth{}, service)
+				return out.Bytes(), err
+			}
+			input := filepath.Join(dir, "input.json")
+			if err = os.WriteFile(input, []byte(`{"meta":{"namespace":"receipt-regression"},"source":{"document_id":"doc"},"comment_id":"comment","content":"reply"}`), 0600); err != nil {
+				t.Fatal(err)
+			}
+			raw, err := run("prepare-reply", "--input", input, "--journal", journal)
+			if err != nil {
+				t.Fatal(err)
+			}
+			var plan contribution.ReplyPlan
+			if err = json.Unmarshal(raw, &plan); err != nil {
+				t.Fatal(err)
+			}
+			path := filepath.Join(dir, "plan.json")
+			if err = os.WriteFile(path, raw, 0600); err != nil {
+				t.Fatal(err)
+			}
+			checkRecovery := func(err error, status contribution.Status) {
+				t.Helper()
+				var typed *contribution.Error
+				if !errors.As(err, &typed) || typed.Code != contribution.ReconciliationRequired || typed.Status != status || ExitCode(err) != 8 {
+					t.Fatalf("lost recovery semantics: %v, exit=%d", err, ExitCode(err))
+				}
+				var encoded bytes.Buffer
+				WriteError(&encoded, err, true)
+				var output ErrorOutput
+				if e := json.Unmarshal(encoded.Bytes(), &output); e != nil || output.Code != string(contribution.ReconciliationRequired) || output.ExitCode != 8 {
+					t.Fatalf("structured error: %s", encoded.String())
+				}
+			}
+			raw, err = run("reply", "--plan", path, "--expect-digest", plan.Digest, "--journal", journal, "--write")
+			var outcome contribution.Outcome
+			if e := json.Unmarshal(raw, &outcome); e != nil {
+				t.Fatal(e)
+			}
+			want := contribution.Committed
+			if lost {
+				want = contribution.Unknown
+			}
+			if outcome.Status != want || sends != 1 || (!lost && outcome.ReplyID != "reply") {
+				t.Fatalf("provider outcome erased: %+v sends=%d", outcome, sends)
+			}
+			checkRecovery(err, want)
+			restore()
+			checkSending := func() {
+				t.Helper()
+				store, e := contributionstate.Open(journal)
+				if e != nil {
+					t.Fatal(e)
+				}
+				defer store.Close()
+				record, e := store.Load(plan.Input.Meta.Namespace, plan.Input.Meta.OperationID)
+				if e != nil || record == nil || record.State != "sending" {
+					t.Fatal("claim lost", record, e)
+				}
+			}
+			checkSending()
+			service = &app.Contributions{API: api, Binding: "account"}
+			raw, err = run("reply", "--plan", path, "--expect-digest", plan.Digest, "--journal", journal, "--write")
+			if err == nil || ExitCode(err) != 8 || sends != 1 || !bytes.Contains(raw, []byte(`"status": "unknown"`)) {
+				t.Fatal("restart resent or erased uncertainty", err, string(raw))
+			}
+			inspecting = true
+			raw, err = run("inspect", "--plan", path, "--journal", journal)
+			var inspection contribution.Inspection
+			if e := json.Unmarshal(raw, &inspection); e != nil {
+				t.Fatal(e)
+			}
+			checkRecovery(err, contribution.Unknown)
+			if inspection.Outcome.Status != contribution.Unknown || sends != 1 {
+				t.Fatal("inspection erased uncertainty or sent")
+			}
+			restore()
+			checkSending()
+			inspecting = false
+			if _, err = run("inspect", "--plan", path, "--journal", journal); err != nil {
+				t.Fatal("inspection did not recover after storage repair", err)
+			}
+			if sends != 1 {
+				t.Fatal("recovery resent")
+			}
+		})
+	}
 }

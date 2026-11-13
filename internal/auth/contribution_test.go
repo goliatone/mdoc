@@ -2,10 +2,13 @@ package auth
 
 import (
 	"context"
+	"encoding/json"
 	"io"
 	"net/http"
+	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -61,5 +64,98 @@ func TestContributionConnectionInvalidatesEveryUse(t *testing.T) {
 	current, _ := store.Load()
 	if current.AccessToken != "first" {
 		t.Fatal("reconnect overwritten")
+	}
+}
+
+// Legacy credentials must acquire a persisted identity before any plan/client can
+// bind to them, even when there is no refresh token to distinguish accounts.
+func TestContributionLegacyConnectionMigration(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.Chmod(dir, 0700); err != nil {
+		t.Fatal(err)
+	}
+	store := NewTokenStore(filepath.Join(dir, "token.json"))
+	writeLegacy := func(access string) {
+		t.Helper()
+		b, err := json.Marshal(&oauth2.Token{AccessToken: access, TokenType: "Bearer", Expiry: time.Now().Add(time.Hour)})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err = os.WriteFile(store.Path(), b, 0600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	writeLegacy("account-A")
+	// Independent stores concurrently admit the same legacy file only once.
+	var wg sync.WaitGroup
+	ids := make(chan string, 8)
+	for i := 0; i < 8; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			token, err := NewTokenStore(store.Path()).Load()
+			if err != nil {
+				t.Error(err)
+				return
+			}
+			ids <- connectionID(token)
+		}()
+	}
+	wg.Wait()
+	close(ids)
+	var generation string
+	for id := range ids {
+		if id == "" {
+			t.Fatal("missing generation")
+		}
+		if generation != "" && generation != id {
+			t.Fatal("concurrent migration split identity")
+		}
+		generation = id
+	}
+	b, err := os.ReadFile(store.Path())
+	if err != nil {
+		t.Fatal(err)
+	}
+	var record struct {
+		Connection string `json:"mdoc_connection_id"`
+	}
+	if err = json.Unmarshal(b, &record); err != nil || record.Connection != generation {
+		t.Fatal("generation not persisted", err)
+	}
+	calls := 0
+	svc := newTestService(t, ServiceOptions{Store: store, HTTPClient: &http.Client{Transport: contributionTransport(func(r *http.Request) (*http.Response, error) {
+		calls++
+		return &http.Response{StatusCode: 200, Header: make(http.Header), Body: io.NopCloser(strings.NewReader("{}"))}, nil
+	})}})
+	old, first, err := svc.ContributionClient(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	before, err := store.Load()
+	if err != nil {
+		t.Fatal(err)
+	}
+	writeLegacy("account-B")
+	_, second, err := svc.ContributionClient(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if first == second {
+		t.Fatal("replacement legacy credentials reused binding")
+	}
+	if resp, err := old.Get("https://example.test/"); err == nil {
+		resp.Body.Close()
+		t.Fatal("old client accepted replacement account")
+	}
+	if calls != 0 {
+		t.Fatal("old client transmitted")
+	}
+	if err = store.saveRefresh(before, before); err == nil {
+		t.Fatal("stale refresh overwrote replacement")
+	}
+	current, err := store.Load()
+	if err != nil || current.AccessToken != "account-B" {
+		t.Fatal("replacement lost", err)
 	}
 }

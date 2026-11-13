@@ -2,7 +2,6 @@ package auth
 
 import (
 	"crypto/rand"
-	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
@@ -37,6 +36,17 @@ func (s *TokenStore) Path() string {
 }
 
 func (s *TokenStore) Load() (*oauth2.Token, error) {
+	release, err := s.lock()
+	if err != nil {
+		return nil, err
+	}
+	defer release()
+	return s.loadLocked()
+}
+
+// loadLocked migrates legacy credentials before exposing a connection identity.
+// The same lock serializes login, migration and refresh compare-and-swap.
+func (s *TokenStore) loadLocked() (*oauth2.Token, error) {
 	info, err := os.Stat(s.path)
 	if errors.Is(err, os.ErrNotExist) {
 		return nil, ErrTokenNotFound
@@ -75,8 +85,14 @@ func (s *TokenStore) Load() (*oauth2.Token, error) {
 		return nil, errors.New("OAuth token file contains no usable token")
 	}
 	if record.ConnectionID == "" {
-		sum := sha256.Sum256([]byte("legacy-connection\x00" + token.RefreshToken + "\x00" + token.TokenType))
-		record.ConnectionID = hex.EncodeToString(sum[:])
+		b := make([]byte, 16)
+		if _, err := rand.Read(b); err != nil {
+			return nil, err
+		}
+		record.ConnectionID = hex.EncodeToString(b)
+		if err := s.write(token, record.ConnectionID); err != nil {
+			return nil, err
+		}
 	}
 	return token.WithExtra(map[string]any{"mdoc_connection_id": record.ConnectionID}), nil
 }
@@ -184,7 +200,7 @@ func (s *TokenStore) saveRefresh(before, after *oauth2.Token) error {
 		return e
 	}
 	defer release()
-	current, e := s.Load()
+	current, e := s.loadLocked()
 	if e != nil {
 		return e
 	}

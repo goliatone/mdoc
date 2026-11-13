@@ -161,12 +161,23 @@ const (
 )
 
 type Inspection struct {
-	Outcome       Outcome   `json:"outcome"`
-	Evidence      Evidence  `json:"evidence"`
-	ObservedAt    time.Time `json:"observed_at"`
-	Postcondition *bool     `json:"postcondition,omitempty"`
-	Candidates    []string  `json:"candidates,omitempty"`
-	Diagnostics   []string  `json:"diagnostics,omitempty"`
+	Outcome       Outcome              `json:"outcome"`
+	Evidence      Evidence             `json:"evidence"`
+	ObservedAt    time.Time            `json:"observed_at"`
+	Postcondition *bool                `json:"postcondition,omitempty"`
+	Candidates    []string             `json:"candidates,omitempty"`
+	Diagnostics   []string             `json:"diagnostics,omitempty"`
+	Creation      *CreationObservation `json:"creation,omitempty"`
+}
+
+// CreationObservation describes a direct read of the trusted retained identity.
+// It is independent of discovery completeness and is not proof of authorship.
+type CreationObservation struct {
+	DocumentID         string `json:"document_id"`
+	Trashed            bool   `json:"trashed"`
+	MetadataMatches    bool   `json:"metadata_matches"`
+	DestinationMatches bool   `json:"destination_matches"`
+	TopologyMatches    bool   `json:"topology_matches"`
 }
 type Renderer interface {
 	Render(context.Context, string) (Artifact, error)

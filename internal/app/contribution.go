@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 
 	"github.com/goliatone/mdoc/contribution"
@@ -305,7 +306,7 @@ func (s *Contributions) Execute(ctx context.Context, kind contribution.Kind, raw
 	record.State = "finished"
 	record.Outcome = o
 	if saveErr := store.Save(p.meta.Namespace, p.meta.OperationID, record); saveErr != nil {
-		return o, saveErr
+		return o, receiptPersistenceError(o, e, saveErr)
 	}
 	return o, e
 }
@@ -353,9 +354,19 @@ func (s *Contributions) Inspect(ctx context.Context, raw []byte, journal string)
 	record.Outcome = result.Outcome
 	record.State = "finished"
 	if saveErr := store.Save(p.meta.Namespace, p.meta.OperationID, record); saveErr != nil {
-		return result, saveErr
+		return result, receiptPersistenceError(result.Outcome, e, saveErr)
 	}
 	return result, e
+}
+
+// Persistence failure does not change what the provider did. Keep its outcome
+// and error, but make recovery mandatory: a later process may see only sending.
+func receiptPersistenceError(o contribution.Outcome, providerErr, saveErr error) error {
+	return errors.Join(&contribution.Error{
+		Status:  o.Status,
+		Code:    contribution.ReconciliationRequired,
+		Message: "receipt could not be durably saved; preserve this output and journal, repair storage and inspect without resending",
+	}, providerErr, saveErr)
 }
 
 func validateContributionRecord(p retainedPlan, r *contributionstate.Record) error {

@@ -21,6 +21,10 @@ type Store struct {
 
 func problem(m string) error { return &contribution.Error{Code: contribution.InvalidInput, Message: m} }
 func Open(path string) (*Store, error) {
+	return open(path, syncDirectory)
+}
+
+func open(path string, syncDir func(string) error) (*Store, error) {
 	if path == "" {
 		return nil, problem("an explicit journal directory is required")
 	}
@@ -34,6 +38,17 @@ func Open(path string) (*Store, error) {
 	info, e := os.Lstat(abs)
 	if e != nil || !info.IsDir() || info.Mode().Perm()&0077 != 0 {
 		return nil, problem("journal must be a private directory (0700), not a symlink")
+	}
+	// A synced record and leaf directory are insufficient if an ancestor's
+	// entry was just created. Sync the entire ancestry on every open, including
+	// retries after a failed sync (when MkdirAll sees existing directories).
+	for parent := abs; ; parent = filepath.Dir(parent) {
+		if e = syncDir(parent); e != nil {
+			return nil, problem("cannot sync journal directory ancestry")
+		}
+		if filepath.Dir(parent) == parent {
+			break
+		}
 	}
 	dir, e := os.Open(abs)
 	if e != nil {
@@ -57,6 +72,15 @@ func Open(path string) (*Store, error) {
 		return nil, problem("another contribution command owns this journal")
 	}
 	return &Store{dir: dir, lock: lock, path: abs}, nil
+}
+
+func syncDirectory(path string) error {
+	f, err := os.Open(path)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+	return f.Sync()
 }
 func (s *Store) Close() error {
 	unix.Flock(int(s.lock.Fd()), unix.LOCK_UN)
