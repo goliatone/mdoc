@@ -1,6 +1,19 @@
 # Changelog
 
+# [0.2.0](https://github.com/goliatone/mdoc/compare/v0.1.0...v0.2.0) - (2026-11-13)
+
+## <!-- 16 -->➕ Add
+
+- Mdoc contribution setup ([b8a1eb8](https://github.com/goliatone/mdoc/commit/b8a1eb81d9a22a1f87934fc0b4cc5177e3777371))  - (goliatone)
+
 # [0.1.0](https://github.com/goliatone/mdoc/tree/v0.1.0) - (2026-09-25)
+
+
+New minor release: v0.1.0
+
+## <!-- 13 -->📦 Bumps
+
+- Bump version: v0.1.0 ([c6095d5](https://github.com/goliatone/mdoc/commit/c6095d5da61c45965dce7a4fd6105ca0779d5e3e))  - (goliatone)
 
 ## <!-- 14 -->🎉 Initial Commit
 
