@@ -49,7 +49,7 @@ func TestTokenStoreSavesAtomicallyWithPrivatePermissions(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(entries) != 1 || entries[0].Name() != "token.json" {
+	if len(entries) != 2 || entries[0].Name() != "token.json" || entries[1].Name() != "token.json.lock" {
 		t.Fatalf("unexpected token directory entries: %v", entries)
 	}
 }

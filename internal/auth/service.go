@@ -295,7 +295,7 @@ func (s *Service) refreshToken(ctx context.Context, credentials Credentials, tok
 		refreshed.RefreshToken = token.RefreshToken
 	}
 	if tokenChanged(token, refreshed) {
-		if err := s.store.Save(refreshed); err != nil {
+		if err := s.store.saveRefresh(token, refreshed); err != nil {
 			return nil, nil, nil, err
 		}
 	}

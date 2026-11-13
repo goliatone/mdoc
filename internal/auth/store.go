@@ -1,6 +1,9 @@
 package auth
 
 import (
+	"crypto/rand"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -8,6 +11,7 @@ import (
 	"path/filepath"
 
 	"golang.org/x/oauth2"
+	"golang.org/x/sys/unix"
 )
 
 var ErrTokenNotFound = errors.New("OAuth token not found")
@@ -57,19 +61,27 @@ func (s *TokenStore) Load() (*oauth2.Token, error) {
 	}
 	defer file.Close()
 
-	var token oauth2.Token
+	var record struct {
+		oauth2.Token
+		ConnectionID string `json:"mdoc_connection_id,omitempty"`
+	}
 	decoder := json.NewDecoder(file)
 	decoder.DisallowUnknownFields()
-	if err := decoder.Decode(&token); err != nil {
+	if err := decoder.Decode(&record); err != nil {
 		return nil, fmt.Errorf("decode OAuth token: %w", err)
 	}
+	token := &record.Token
 	if token.AccessToken == "" && token.RefreshToken == "" {
 		return nil, errors.New("OAuth token file contains no usable token")
 	}
-	return &token, nil
+	if record.ConnectionID == "" {
+		sum := sha256.Sum256([]byte("legacy-connection\x00" + token.RefreshToken + "\x00" + token.TokenType))
+		record.ConnectionID = hex.EncodeToString(sum[:])
+	}
+	return token.WithExtra(map[string]any{"mdoc_connection_id": record.ConnectionID}), nil
 }
 
-func (s *TokenStore) Save(token *oauth2.Token) error {
+func (s *TokenStore) write(token *oauth2.Token, connection string) error {
 	if token == nil {
 		return errors.New("cannot save a nil OAuth token")
 	}
@@ -98,7 +110,10 @@ func (s *TokenStore) Save(token *oauth2.Token) error {
 		return fmt.Errorf("protect temporary OAuth token: %w", err)
 	}
 	encoder := json.NewEncoder(temporary)
-	if err := encoder.Encode(token); err != nil {
+	if err := encoder.Encode(struct {
+		*oauth2.Token
+		ConnectionID string `json:"mdoc_connection_id"`
+	}{token, connection}); err != nil {
 		return fmt.Errorf("encode OAuth token: %w", err)
 	}
 	if err := temporary.Sync(); err != nil {
@@ -123,7 +138,7 @@ func (s *TokenStore) Save(token *oauth2.Token) error {
 	return nil
 }
 
-func (s *TokenStore) Remove() error {
+func (s *TokenStore) remove() error {
 	err := os.Remove(s.path)
 	if errors.Is(err, os.ErrNotExist) {
 		return nil
@@ -132,4 +147,57 @@ func (s *TokenStore) Remove() error {
 		return fmt.Errorf("remove OAuth token: %w", err)
 	}
 	return nil
+}
+
+// lock serializes connection replacement and compare-and-swap refreshes.
+func (s *TokenStore) lock() (func(), error) {
+	if e := os.MkdirAll(filepath.Dir(s.path), 0700); e != nil {
+		return nil, e
+	}
+	fd, e := unix.Open(s.path+".lock", unix.O_CREAT|unix.O_RDWR|unix.O_NOFOLLOW, 0600)
+	if e != nil {
+		return nil, e
+	}
+	f := os.NewFile(uintptr(fd), s.path+".lock")
+	if e := unix.Flock(fd, unix.LOCK_EX); e != nil {
+		f.Close()
+		return nil, e
+	}
+	return func() { unix.Flock(fd, unix.LOCK_UN); f.Close() }, nil
+}
+func connectionID(t *oauth2.Token) string { v, _ := t.Extra("mdoc_connection_id").(string); return v }
+func (s *TokenStore) Save(token *oauth2.Token) error {
+	release, e := s.lock()
+	if e != nil {
+		return e
+	}
+	defer release()
+	b := make([]byte, 16)
+	if _, e = rand.Read(b); e != nil {
+		return e
+	}
+	return s.write(token, hex.EncodeToString(b))
+}
+func (s *TokenStore) saveRefresh(before, after *oauth2.Token) error {
+	release, e := s.lock()
+	if e != nil {
+		return e
+	}
+	defer release()
+	current, e := s.Load()
+	if e != nil {
+		return e
+	}
+	if connectionID(current) != connectionID(before) || tokenChanged(current, before) {
+		return errors.New("account credentials changed during refresh")
+	}
+	return s.write(after, connectionID(current))
+}
+func (s *TokenStore) Remove() error {
+	release, e := s.lock()
+	if e != nil {
+		return e
+	}
+	defer release()
+	return s.remove()
 }

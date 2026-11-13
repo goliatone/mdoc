@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/alecthomas/kong"
+	"github.com/goliatone/mdoc/contribution"
 	"github.com/goliatone/mdoc/internal/app"
 	"github.com/goliatone/mdoc/internal/auth"
 	mdocconfig "github.com/goliatone/mdoc/internal/config"
@@ -31,16 +32,18 @@ type ProbeService interface {
 }
 
 type Runtime struct {
-	WorkingDraft workingdraft.API
-	Context      context.Context
-	App          app.Service
-	Auth         AuthService
-	Probe        ProbeService
-	Out          io.Writer
-	Explicit     map[string]bool
+	Contributions *app.Contributions
+	WorkingDraft  workingdraft.API
+	Context       context.Context
+	App           app.Service
+	Auth          AuthService
+	Probe         ProbeService
+	Out           io.Writer
+	Explicit      map[string]bool
 }
 
 type CLI struct {
+	Contribution ContributionCmd  `cmd:"" help:"Prepare, perform and inspect explicit Google document contributions."`
 	WorkingDraft WorkingDraftCmd  `cmd:"" help:"Read Google-authored working drafts without publishing."`
 	Version      kong.VersionFlag `name:"version" help:"Print the mdoc version and exit."`
 	Init         InitCmd          `cmd:"" help:"Create a workspace configuration."`
@@ -598,10 +601,14 @@ func (e *UsageError) Unwrap() error {
 }
 
 func Execute(args []string, stdout, stderr io.Writer, authService AuthService, services ...any) error {
+	var contributions *app.Contributions
 	var draft workingdraft.API
 	var probeService ProbeService
 	var appService app.Service
 	for _, candidate := range services {
+		if service, ok := candidate.(*app.Contributions); ok {
+			contributions = service
+		}
 		if service, ok := candidate.(workingdraft.API); ok {
 			draft = service
 		}
@@ -644,7 +651,7 @@ func Execute(args []string, stdout, stderr io.Writer, authService AuthService, s
 	if err != nil {
 		return &UsageError{Err: err}
 	}
-	if err := parsed.Run(&Runtime{WorkingDraft: draft, Context: context.Background(), App: appService, Auth: authService, Probe: probeService, Out: stdout, Explicit: explicitFlags(args)}); err != nil {
+	if err := parsed.Run(&Runtime{Contributions: contributions, WorkingDraft: draft, Context: context.Background(), App: appService, Auth: authService, Probe: probeService, Out: stdout, Explicit: explicitFlags(args)}); err != nil {
 		if _, ok := errors.AsType[*kong.ParseError](err); ok {
 			return &UsageError{Err: err}
 		}
@@ -667,6 +674,26 @@ func yesNo(value bool) string {
 }
 
 func ExitCode(err error) int {
+	if e, ok := errors.AsType[*contribution.Error](err); ok {
+		if e.Status == contribution.Unknown || e.Code == contribution.ReconciliationRequired {
+			return 8
+		}
+		switch e.Code {
+		case contribution.AccountUnavailable, contribution.AccessDenied:
+			return 4
+		case contribution.InvalidPlan, contribution.Stale:
+			return 5
+		case contribution.UnsupportedText:
+			return 3
+		case contribution.UnsupportedContent, contribution.Unavailable:
+			return 6
+		case contribution.TransportFailure, contribution.LimitExceeded:
+			return 7
+		default:
+			return 2
+		}
+	}
+
 	if _, ok := errors.AsType[*UsageError](err); ok {
 		return 2
 	}
@@ -696,6 +723,10 @@ func WriteError(writer io.Writer, err error, jsonOutput bool) {
 		result.Class = "working_draft"
 		result.Code = string(typed.Code)
 	}
+	if typed, ok := errors.AsType[*contribution.Error](err); ok {
+		result.Class = "contribution"
+		result.Code = string(typed.Code)
+	}
 	if _, ok := errors.AsType[*UsageError](err); ok {
 		result.Code = "usage_error"
 	}
@@ -703,7 +734,7 @@ func WriteError(writer io.Writer, err error, jsonOutput bool) {
 }
 
 func WantsJSON(args []string) bool {
-	if len(args) > 0 && args[0] == "working-draft" {
+	if len(args) > 0 && (args[0] == "working-draft" || args[0] == "contribution") {
 		return true
 	}
 	projectPath := ""
