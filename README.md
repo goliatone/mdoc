@@ -543,3 +543,58 @@ The built-in conversion version is `google-docs-prose-v2`. Recapture both baseli
 Custom `Provider.Document` implementations now return the original `json.RawMessage`, preserving absent versus explicitly false style properties. Do not round-trip responses through SDK structs. Converters receive resolved effective text styles, while snapshot evidence preserves original field presence. Named-style inheritance, independent list boundaries and parent marker widths are preserved; ambiguous nesting and code-like mixed indentation block body use.
 
 Custom authentication stores now implement `Load(ctx, accountRef) (CredentialRecord, error)` and `CompareAndSwap(ctx, accountRef, expectedRevision, nextRecord) (bool, error)`. Persist the token, unique revision and connection ID together in private storage. CAS must be atomic across every process using the store; return false without mutation on a revision mismatch. Load returns an empty record for an absent account, and revisions must never be reused. Reconnection changes the connection ID and invalidates previous token sources and pending callbacks. This replaces the earlier unconditional Load/Save API; a process-local mutex around Save is insufficient for shared storage.
+
+## Explicit document contributions
+
+The additive `contribution` package and `mdoc contribution` commands create a supported document, change one interior text span, or reply to an existing unresolved comment. They use the existing OAuth account and app-file access. They do not publish review generations, change sharing, resolve comments, accept reviews, or synchronize content automatically.
+
+Preparation reads and renders only. Execution requires the exact retained plan, its digest, the same private journal and `--write`. Run these commands with a locally built binary (`go build -o /tmp/mdoc-contribution ./cmd/mdoc`) until this additive API is released. No release version is assigned yet.
+
+```sh
+umask 077
+mkdir -p .mdoc-contributions
+cat > .mdoc-contributions/create-input.json <<'JSON'
+{
+  "meta": {"namespace": "local-review"},
+  "parent_id": "APP_AUTHORIZED_MY_DRIVE_FOLDER_ID",
+  "title": "Design review",
+  "markdown": "# Design review\n\nA **prepared** document."
+}
+JSON
+/tmp/mdoc-contribution contribution prepare-create \
+  --input .mdoc-contributions/create-input.json \
+  --journal .mdoc-contributions/journal > .mdoc-contributions/create-plan.json
+# Review input.markdown, input.title, input.parent_id and the retained artifact.
+/tmp/mdoc-contribution contribution create --plan .mdoc-contributions/create-plan.json \
+  --expect-digest "$(jq -r .digest .mdoc-contributions/create-plan.json)" \
+  --journal .mdoc-contributions/journal --write
+/tmp/mdoc-contribution contribution inspect --plan .mdoc-contributions/create-plan.json \
+  --journal .mdoc-contributions/journal
+```
+
+Preparation supplies schema version 1, a random operation ID and the current opaque login binding when omitted. Supply a retained `meta.operation_id` to repeat preparation of the same logical operation; omitting it prepares a new operation. Reusing an ID for different content conflicts. Never use a second journal to retry the same operation. Journals contain private plans/receipts, use directory mode `0700` and file mode `0600`, and must be kept with their plans.
+
+For replies, use `prepare-reply --input reply-input.json --journal ...` then `reply --plan reply-plan.json --expect-digest ... --journal ... --write`. Input:
+
+```json
+{
+  "meta": {"namespace": "local-review"},
+  "source": {"document_id": "DOCUMENT_ID"},
+  "comment_id": "EXISTING_UNRESOLVED_COMMENT_ID",
+  "content": "Reviewed; the proposed wording looks correct."
+}
+```
+
+Use `working-draft discussion DOCUMENT_ID --all` to find comment IDs. Replies work independently of body conversion. The immediate thread recheck is not atomic with Google's reply creation, so a concurrent thread change remains possible.
+
+For updates, capture with `working-draft capture DOCUMENT_ID`, check `body_usable`, and use the native paragraph/run indices in `raw_content`. `prepare-update` accepts `meta`, `source`, `expected_revision`, `selection` and `replacement`; `selection` contains `paragraph_start`, rune offsets `start`/`end`, exact `expected_text` and `paragraph_digest`. Compute the latter with `contribution.ParagraphDigest(nativeParagraphWithoutFinalNewline)`. The plan previews `before`/`after` and binds the resolved tab, UTF-16 range and native styling. Execute with `apply-update --plan ... --expect-digest ... --journal ... --write`. A revision conflict requires fresh preparation and a new operation ID.
+
+Only a span strictly inside one original unlinked text run is eligible: in `abcd`, replacing `bc`, deleting `bc`, or inserting between `b` and `c` works. Whole-run changes, run/paragraph edges, links, empty paragraphs, suggestions and unsupported structures fail before mutation. Replacement preserves exact Unicode text, including astral characters; it rejects newlines, controls except tab, and Google-stripped U+E000–U+F8FF characters. No formatting requests are emitted.
+
+Create supports headings, paragraphs, lists, emphasis and explicit HTTP(S) links. It requires Pandoc and an existing writable My Drive folder. Images, tables, raw HTML, local links, filters and external resources are rejected. Limits are 1 MiB Markdown, 10 MiB DOCX, 1 KiB title, 64 KiB replacement/reply, 10 MiB per response and 100 discovery pages. Shared Drives and multiple tabs remain unsupported.
+
+Execution emits an outcome on stdout even when it returns an error: `committed`, `not_sent`, `conflict`, or `unknown`. A repeated committed command returns its receipt without another provider call. Every claimed operation is single-send, including `not_sent`/`conflict`; correct the input and prepare a new operation when safe. Lost responses, process crashes in `sending`, and missing acknowledgment IDs require `inspect` or manual reconciliation. Inspection never resends, proves absence after a timeout, or attributes a matching reply solely by its text. Historical committed receipts survive later edits, deletion or lost access. Do not delete or reset a journal to escape uncertainty. Exit code 8 indicates reconciliation is required; structured error codes distinguish other failures.
+
+Applications import `github.com/goliatone/mdoc/contribution` and construct `New(Options{AccountBinding: connectionID, TokenSource: tokenSource})`, or supply an explicitly authenticated `HTTPClient`. Supply exactly one auth configuration; injected transports must not retry writes. The typed `PrepareCreate/Create`, `PrepareUpdate/ApplyUpdate`, `PrepareReply/Reply` and `InspectOutcome` APIs contain no ctx policies or SDK request DTOs. Use `DecodeCreatePlan`, `DecodeUpdatePlan` and `DecodeReplyPlan` for retained JSON. The service has no durable store: the host must authorize exact content, atomically bind operation/digest, serialize claims, persist `sending` before dispatch, and retain the outcome even when an error is returned. Set `Attempt.FirstTransmission` only for that fresh durable claim. A digest and attempt ID are not authorization. Reconnection requires a newly prepared plan; the CLI's persisted login generation survives refresh but changes on login/logout.
+
+Local SDK/CLI smoke covers create/replay, stale/fresh updates, replies, inspection, cross-process locks and crash/lost-response recovery. A maintainer-authorized disposable Google folder/document is still required to verify visible conversion and surrounding formatting before production adoption. No live write, acceptance, tag, release or ctx consumer adoption is implied by these checks.

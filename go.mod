@@ -1,12 +1,12 @@
 module github.com/goliatone/mdoc
 
-go 1.26
+go 1.26.0
 
 require (
 	github.com/alecthomas/kong v1.16.0
 	github.com/beevik/etree v1.7.0
 	github.com/bmatcuk/doublestar/v4 v4.10.0
-	github.com/goliatone/go-config v0.14.0
+	github.com/goliatone/go-config v0.15.1
 	github.com/hexops/gotextdiff v1.0.3
 	golang.org/x/oauth2 v0.36.0
 	golang.org/x/sys v0.47.0
@@ -34,10 +34,10 @@ require (
 	github.com/go-ozzo/ozzo-validation/v4 v4.3.0 // indirect
 	github.com/go-sourcemap/sourcemap v2.1.4+incompatible // indirect
 	github.com/go-viper/mapstructure/v2 v2.4.0 // indirect
-	github.com/goliatone/go-errors v0.10.0 // indirect
-	github.com/goliatone/go-logger v0.8.4 // indirect
+	github.com/goliatone/go-errors v0.12.0 // indirect
+	github.com/goliatone/go-logger v0.10.1 // indirect
 	github.com/goliatone/go-masker v0.2.0 // indirect
-	github.com/goliatone/go-options v0.7.1 // indirect
+	github.com/goliatone/go-options v0.7.2 // indirect
 	github.com/google/cel-go v0.26.1 // indirect
 	github.com/google/pprof v0.0.0-20251208000136-3d256cb9ff16 // indirect
 	github.com/google/s2a-go v0.1.9 // indirect
@@ -72,7 +72,7 @@ require (
 	go.opentelemetry.io/otel/metric v1.44.0 // indirect
 	go.opentelemetry.io/otel/trace v1.44.0 // indirect
 	golang.org/x/crypto v0.54.0 // indirect
-	golang.org/x/exp v0.0.0-20251209150349-8475f28825e9 // indirect
+	golang.org/x/exp v0.0.0-20260218203240-3dfff04db8fa // indirect
 	golang.org/x/net v0.57.0 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20260630182238-925bb5da69e7 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20260724162435-b2f20204f0df // indirect
